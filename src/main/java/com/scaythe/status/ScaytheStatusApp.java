@@ -8,5 +8,10 @@ public class ScaytheStatusApp {
 
     public static void main(String[] args) {
         SpringApplication.run(ScaytheStatusApp.class, args);
+
+        try {
+            Thread.currentThread().join();
+        } catch (InterruptedException e) {
+        }
     }
 }

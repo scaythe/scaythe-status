@@ -8,13 +8,20 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
-public class TimeModule extends StatusModule {
+public class ClockModule extends StatusModule {
+
+    private static final String NAME = "clock";
+
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private Disposable disposable = null;
 
-    public TimeModule(Runnable update) {
-        super(update);
+    public ClockModule(Runnable update) {
+        this(null, update);
+    }
+
+    public ClockModule(String instance, Runnable update) {
+        super(NAME, instance, update);
     }
 
     @Override

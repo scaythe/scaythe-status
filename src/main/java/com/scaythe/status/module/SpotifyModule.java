@@ -1,5 +1,6 @@
 package com.scaythe.status.module;
 
+import com.scaythe.status.input.ClickEvent;
 import org.freedesktop.DBus;
 import org.freedesktop.dbus.DBusMap;
 import org.freedesktop.dbus.connections.impl.DBusConnection;
@@ -16,15 +17,22 @@ import java.util.stream.Collectors;
 
 public class SpotifyModule extends StatusModule {
 
+    private static final String NAME = "spotify";
+
     private final static String dbusBusName = "org.freedesktop.DBus";
     private final static String dbusPath = "/org/freedesktop/DBus";
     private final static String spotifyBusName = "org.mpris.MediaPlayer2.spotify";
     private final static String spotifyPath = "/org/mpris/MediaPlayer2";
 
     private DBusConnection connection = null;
+    private Player player = null;
 
     public SpotifyModule(Runnable update) {
-        super(update);
+        this(null, update);
+    }
+
+    public SpotifyModule(String instance, Runnable update) {
+        super(NAME, instance, update);
     }
 
     @Override
@@ -86,6 +94,8 @@ public class SpotifyModule extends StatusModule {
     }
 
     private void spotifyStopping(String spotifyName) throws DBusException {
+        player = null;
+
         connection.removeSigHandler(Properties.PropertiesChanged.class, spotifyName, this::propertiesChanged);
         update(new ModuleData(""));
     }
@@ -93,6 +103,8 @@ public class SpotifyModule extends StatusModule {
     private void spotifyRunning(String spotifyName) throws DBusException {
         connection.addSigHandler(Properties.PropertiesChanged.class, spotifyName, this::propertiesChanged);
         currentStatus();
+
+        player = connection.getPeerRemoteObject(spotifyBusName, spotifyPath, Player.class);
     }
 
     private void currentStatus() throws DBusException {
@@ -156,6 +168,13 @@ public class SpotifyModule extends StatusModule {
 
     private String variantStringList(Variant<List<String>> v) {
         return String.join(", ", v.getValue());
+    }
+
+    @Override
+    public void event(ClickEvent event) {
+        if (player != null) {
+            player.PlayPause();
+        }
     }
 
     @Override

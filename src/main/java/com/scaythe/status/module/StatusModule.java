@@ -1,12 +1,20 @@
 package com.scaythe.status.module;
 
+import com.scaythe.status.input.ClickEvent;
+
 import java.util.Objects;
+import java.util.Optional;
 
 public abstract class StatusModule implements Runnable {
+
+    private final String name;
+    private final String instance;
     private final Runnable update;
     private ModuleData data = new ModuleData("");
 
-    public StatusModule(Runnable update) {
+    public StatusModule(String name, String instance, Runnable update) {
+        this.name = name;
+        this.instance = instance;
         this.update = update;
     }
 
@@ -17,9 +25,20 @@ public abstract class StatusModule implements Runnable {
         }
     }
 
+    public String name() {
+        return name;
+    }
+
+    public Optional<String> instance() {
+        return Optional.ofNullable(instance);
+    }
+
     public ModuleData data() {
         return data;
     }
 
     public abstract void stop();
+
+    public void event(ClickEvent event) {
+    }
 }
