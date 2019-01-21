@@ -19,10 +19,10 @@ public class SpotifyModule extends StatusModule {
 
     private static final String NAME = "spotify";
 
-    private final static String dbusBusName = "org.freedesktop.DBus";
-    private final static String dbusPath = "/org/freedesktop/DBus";
-    private final static String spotifyBusName = "org.mpris.MediaPlayer2.spotify";
-    private final static String spotifyPath = "/org/mpris/MediaPlayer2";
+    private static final String DBUS_BUS_NAME = "org.freedesktop.DBus";
+    private static final String DBUS_PATH = "/org/freedesktop/DBus";
+    private static final String SPOTIFY_BUS_NAME = "org.mpris.MediaPlayer2.spotify";
+    private static final String SPOTIFY_PATH = "/org/mpris/MediaPlayer2";
 
     private DBusConnection connection = null;
     private Player player = null;
@@ -32,7 +32,7 @@ public class SpotifyModule extends StatusModule {
     }
 
     public SpotifyModule(String instance, Runnable update) {
-        super(NAME, instance, update);
+        super(NAME, instance, null, update);
     }
 
     @Override
@@ -50,12 +50,12 @@ public class SpotifyModule extends StatusModule {
         }
 
         try {
-            DBus dbus = connection.getRemoteObject(dbusBusName, dbusPath, DBus.class);
+            DBus dbus = connection.getRemoteObject(DBUS_BUS_NAME, DBUS_PATH, DBus.class);
 
             registerSpotifyStartStopListener();
 
-            if (dbus.NameHasOwner(spotifyBusName)) {
-                String spotifyName = dbus.GetNameOwner(spotifyBusName);
+            if (dbus.NameHasOwner(SPOTIFY_BUS_NAME)) {
+                String spotifyName = dbus.GetNameOwner(SPOTIFY_BUS_NAME);
 
                 spotifyRunning(spotifyName);
             }
@@ -73,7 +73,7 @@ public class SpotifyModule extends StatusModule {
     private void nameOwnerChanged(DBus.NameOwnerChanged noc) {
         String name = noc.name;
 
-        if (!name.equals(spotifyBusName)) {
+        if (!name.equals(SPOTIFY_BUS_NAME)) {
             return;
         }
 
@@ -104,11 +104,13 @@ public class SpotifyModule extends StatusModule {
         connection.addSigHandler(Properties.PropertiesChanged.class, spotifyName, this::propertiesChanged);
         currentStatus();
 
-        player = connection.getPeerRemoteObject(spotifyBusName, spotifyPath, Player.class);
+        player = connection.getPeerRemoteObject(SPOTIFY_BUS_NAME, SPOTIFY_PATH, Player.class);
     }
 
     private void currentStatus() throws DBusException {
-        Properties props = connection.getRemoteObject(spotifyBusName, spotifyPath, Properties.class);
+        Properties props = connection.getRemoteObject(SPOTIFY_BUS_NAME,
+                SPOTIFY_PATH,
+                Properties.class);
 
         update(props.GetAll(Player.class.getName()));
     }
@@ -132,12 +134,12 @@ public class SpotifyModule extends StatusModule {
 
     private Optional<String> color(String status) {
         switch (status) {
+            case "Playing":
+                return Optional.of("#00ff00");
             case "Paused":
                 return Optional.of("#ffff00");
-            case "Stopped":
-                return Optional.of("#ff0000");
             default:
-                return Optional.empty();
+                return Optional.of("#ff0000");
         }
     }
 

@@ -15,15 +15,11 @@ import java.util.stream.Collectors;
 public class StatusWriter {
 
     public void write(List<StatusModule> modules) {
-        System.out.println(message(modules));
-    }
-
-    private String message(List<StatusModule> modules) {
-        return "[" + modules(modules) + "],";
+        System.out.println(modules(modules));
     }
 
     private String modules(List<StatusModule> modules) {
-        return modules.stream().map(this::module).collect(Collectors.joining(","));
+        return modules.stream().map(this::module).collect(Collectors.joining(",", "[", "],"));
     }
 
     private String module(StatusModule module) {
@@ -33,6 +29,7 @@ public class StatusWriter {
         color(module.data()).ifPresent(data::add);
         data.add(name(module));
         instance(module).ifPresent(data::add);
+        markup(module).ifPresent(data::add);
 
         return data.stream().collect(Collectors.joining(",", "{", "}"));
     }
@@ -51,6 +48,10 @@ public class StatusWriter {
 
     private Optional<String> instance(StatusModule module) {
         return module.instance().map(c -> entry("instance", c));
+    }
+
+    private Optional<String> markup(StatusModule module) {
+        return module.markup().map(c -> entry("markup", c));
     }
 
     private String entry(String header, String value) {

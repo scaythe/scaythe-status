@@ -15,8 +15,14 @@ public abstract class SamplingModule<T> extends StatusModule {
 
     private Disposable disposable = null;
 
-    public SamplingModule(Duration sampleRate, int size, String name, String instance, Runnable update) {
-        super(name, instance, update);
+    public SamplingModule(
+            Duration sampleRate,
+            int size,
+            String name,
+            String instance,
+            String markup,
+            Runnable update) {
+        super(name, instance, markup, update);
 
         this.samples = new LimitedQueue<>(size);
         this.sampleRate = sampleRate;

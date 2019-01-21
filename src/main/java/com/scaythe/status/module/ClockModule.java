@@ -17,7 +17,7 @@ public class ClockModule extends SamplingModule<Instant> {
     }
 
     public ClockModule(String instance, Runnable update) {
-        super(Duration.ofMillis(100), 1, NAME, instance, update);
+        super(Duration.ofMillis(100), 1, NAME, instance, null, update);
     }
 
     @Override

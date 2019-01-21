@@ -1,13 +1,19 @@
 package com.scaythe.status.module;
 
+import com.scaythe.status.format.FormatBytes;
+import com.scaythe.status.format.FormatPercent;
+import com.scaythe.status.markup.PangoMarkup;
+import com.scaythe.status.module.sub.Submodule;
 import oshi.SystemInfo;
 import oshi.hardware.NetworkIF;
 
-import java.text.MessageFormat;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.ToDoubleFunction;
 import java.util.function.ToLongFunction;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class SystemModule extends SamplingModule<SystemData> {
@@ -17,12 +23,35 @@ public class SystemModule extends SamplingModule<SystemData> {
 
     private final SystemInfo systemInfo = new SystemInfo();
 
+    private final List<Submodule<SystemData, ?>> submodules = new ArrayList<>();
+
     public SystemModule(Runnable update) {
         this(null, update);
     }
 
     public SystemModule(String instance, Runnable update) {
-        super(Duration.ofSeconds(1), SAMPLE_SIZE, NAME, instance, update);
+        super(Duration.ofSeconds(1), SAMPLE_SIZE, NAME, instance, PangoMarkup.NAME, update);
+
+        submodules.add(new Submodule<>("\uF2DB",
+                SystemData::cpu,
+                this::percent,
+                this::percentColors));
+        submodules.add(new Submodule<>("\uF0C9",
+                SystemData::memory,
+                this::percent,
+                this::percentColors));
+        submodules.add(new Submodule<>("\uF0EC",
+                SystemData::swap,
+                this::percent,
+                this::swapColors));
+        submodules.add(new Submodule<>("\uF019",
+                SystemData::netDown,
+                this::avgBytes,
+                d -> Optional.empty()));
+        submodules.add(new Submodule<>("\uF093",
+                SystemData::netUp,
+                this::avgBytes,
+                d -> Optional.empty()));
     }
 
     @Override
@@ -51,31 +80,54 @@ public class SystemModule extends SamplingModule<SystemData> {
     }
 
     private long netDown() {
-        return Stream.of(systemInfo.getHardware().getNetworkIFs()).mapToLong(NetworkIF::getBytesRecv).sum();
+        return Stream.of(systemInfo.getHardware().getNetworkIFs())
+                .mapToLong(NetworkIF::getBytesRecv)
+                .sum();
     }
 
     private long netUp() {
-        return Stream.of(systemInfo.getHardware().getNetworkIFs()).mapToLong(NetworkIF::getBytesSent).sum();
+        return Stream.of(systemInfo.getHardware().getNetworkIFs())
+                .mapToLong(NetworkIF::getBytesSent)
+                .sum();
     }
 
     @Override
     public ModuleData reduce(List<SystemData> samples) {
         SystemData avg = reduceData(samples);
 
-        return new ModuleData(MessageFormat.format("\uF2DB {0} \uF0C9 {1} \uF0EC {2} \uF019 {3} \uF093 {4}",
-                percent(avg.cpu()),
-                percent(avg.memory()),
-                percent(avg.swap()),
-                avgBytes(avg.netDown()),
-                avgBytes(avg.netUp())));
+        String submodulesText = submodules.stream()
+                .map(s -> s.format(avg))
+                .collect(Collectors.joining("<span fallback=\\\"false\\\"> </span>"));
+
+        return new ModuleData(submodulesText);
     }
 
     private String percent(double d) {
-        return formatPercent(d);
+        return FormatPercent.format(d);
+    }
+
+    private Optional<String> percentColors(double d) {
+        if (d < .5d) {
+            return Optional.of("lime");
+        } else if (d < .8d) {
+            return Optional.of("yellow");
+        } else {
+            return Optional.of("red");
+        }
+    }
+
+    private Optional<String> swapColors(double d) {
+        if (d < .1d) {
+            return Optional.of("lime");
+        } else if (d < .4d) {
+            return Optional.of("yellow");
+        } else {
+            return Optional.of("red");
+        }
     }
 
     private String avgBytes(long bytes) {
-        return formatBytes((double) bytes / (double) SAMPLE_SIZE);
+        return FormatBytes.format((double) bytes / (double) SAMPLE_SIZE);
     }
 
     private SystemData reduceData(List<SystemData> samples) {
@@ -91,28 +143,7 @@ public class SystemModule extends SamplingModule<SystemData> {
     }
 
     private long difference(List<SystemData> samples, ToLongFunction<SystemData> getter) {
-        return getter.applyAsLong(samples.get(samples.size() - 1)) - getter.applyAsLong(samples.get(0));
-    }
-
-    private static final String PERCENT_FORMAT = "%6.2f%%";
-
-    private static String formatPercent(double d) {
-        return String.format(PERCENT_FORMAT, d * 100);
-    }
-
-    // https://stackoverflow.com/questions/3758606/how-to-convert-byte-size-into-human-readable-format-in-java
-    private static final String[] BYTE_UNITS = {"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"};
-    private static final double BYTE_BASE = 1024d;
-    private static final String BYTE_FORMAT = "%6.1f %-3s";
-
-    private static String formatBytes(double bytes) {
-        // When using the smallest unit no decimal point is needed, because it's the exact number.
-        if (bytes < BYTE_BASE) {
-            return String.format(BYTE_FORMAT, bytes, BYTE_UNITS[0]);
-        }
-
-        final int exponent = (int) (Math.log(bytes) / Math.log(BYTE_BASE));
-        final String unit = BYTE_UNITS[exponent];
-        return String.format(BYTE_FORMAT, bytes / Math.pow(BYTE_BASE, exponent), unit);
+        return getter.applyAsLong(samples.get(samples.size() - 1)) - getter.applyAsLong(samples.get(
+                0));
     }
 }
