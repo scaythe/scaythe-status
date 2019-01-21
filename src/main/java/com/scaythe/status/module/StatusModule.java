@@ -1,11 +1,12 @@
 package com.scaythe.status.module;
 
 import com.scaythe.status.input.ClickEvent;
+import org.springframework.context.Lifecycle;
 
 import java.util.Objects;
 import java.util.Optional;
 
-public abstract class StatusModule implements Runnable {
+public abstract class StatusModule implements Lifecycle {
 
     private final String name;
     private final String instance;
@@ -36,8 +37,6 @@ public abstract class StatusModule implements Runnable {
     public ModuleData data() {
         return data;
     }
-
-    public abstract void stop();
 
     public void event(ClickEvent event) {
     }

@@ -2,6 +2,8 @@ package com.scaythe.status;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+import oshi.SystemInfo;
 
 @SpringBootApplication
 public class ScaytheStatusApp {
@@ -13,5 +15,10 @@ public class ScaytheStatusApp {
             Thread.currentThread().join();
         } catch (InterruptedException e) {
         }
+    }
+
+    @Bean
+    public SystemInfo systemInfo() {
+        return new SystemInfo();
     }
 }

@@ -36,7 +36,7 @@ public class SpotifyModule extends StatusModule {
     }
 
     @Override
-    public void run() {
+    public void start() {
         if (connection != null) {
             return;
         }
@@ -182,5 +182,10 @@ public class SpotifyModule extends StatusModule {
         if (connection != null) {
             connection.disconnect();
         }
+    }
+
+    @Override
+    public boolean isRunning() {
+        return connection != null;
     }
 }

@@ -1,48 +1,32 @@
 package com.scaythe.status.module;
 
-import reactor.core.Disposable;
-import reactor.core.publisher.Flux;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
-public class ClockModule extends StatusModule {
+public class ClockModule extends SamplingModule<Instant> {
 
     private static final String NAME = "clock";
 
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
-    private Disposable disposable = null;
 
     public ClockModule(Runnable update) {
         this(null, update);
     }
 
     public ClockModule(String instance, Runnable update) {
-        super(NAME, instance, update);
+        super(Duration.ofMillis(100), 1, NAME, instance, update);
     }
 
     @Override
-    public void run() {
-        update(date());
-
-        if (disposable != null) {
-            return;
-        }
-
-        disposable = Flux.interval(Duration.ofMillis(100)).map(l -> date()).doOnNext(this::update).subscribe();
-    }
-
-    private ModuleData date() {
-        return new ModuleData(formatter.format(Instant.now().atZone(ZoneId.systemDefault())));
+    public Instant sample() {
+        return Instant.now();
     }
 
     @Override
-    public void stop() {
-        if (disposable != null) {
-            disposable.dispose();
-        }
+    public ModuleData reduce(List<Instant> samples) {
+        return new ModuleData(formatter.format(samples.get(0).atZone(ZoneId.systemDefault())));
     }
 }

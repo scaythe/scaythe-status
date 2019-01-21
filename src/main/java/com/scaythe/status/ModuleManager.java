@@ -4,8 +4,10 @@ import com.scaythe.status.input.ClickEvent;
 import com.scaythe.status.module.ClockModule;
 import com.scaythe.status.module.SpotifyModule;
 import com.scaythe.status.module.StatusModule;
+import com.scaythe.status.module.SystemModule;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
+import oshi.SystemInfo;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,15 +16,16 @@ import java.util.Objects;
 @Component
 public class ModuleManager implements SmartLifecycle {
 
-    private final StatusWriter writer;
     private final List<StatusModule> modules = new ArrayList<>();
+    private final StatusWriter writer;
 
     private boolean running = false;
 
-    public ModuleManager(StatusWriter writer) {
+    public ModuleManager(StatusWriter writer, SystemInfo systemInfo) {
         this.writer = writer;
 
         modules.add(new SpotifyModule(this::update));
+        modules.add(new SystemModule(this::update));
         modules.add(new ClockModule(this::update));
     }
 
@@ -33,7 +36,7 @@ public class ModuleManager implements SmartLifecycle {
 
         update();
 
-        modules.forEach(StatusModule::run);
+        modules.forEach(StatusModule::start);
 
         running = true;
     }
