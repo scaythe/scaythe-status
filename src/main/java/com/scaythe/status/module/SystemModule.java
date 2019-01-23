@@ -97,7 +97,7 @@ public class SystemModule extends SamplingModule<SystemData> {
 
         String submodulesText = submodules.stream()
                 .map(s -> s.format(avg))
-                .collect(Collectors.joining("<span fallback=\\\"false\\\"> </span>"));
+                .collect(Collectors.joining("<span fallback=\"false\"> </span>"));
 
         return new ModuleData(submodulesText);
     }

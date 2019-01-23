@@ -5,6 +5,7 @@ import com.scaythe.status.module.ClockModule;
 import com.scaythe.status.module.SpotifyModule;
 import com.scaythe.status.module.StatusModule;
 import com.scaythe.status.module.SystemModule;
+import com.scaythe.status.write.StatusWriter;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
 import oshi.SystemInfo;
