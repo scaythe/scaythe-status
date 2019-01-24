@@ -16,7 +16,7 @@ public class FormatBytes {
 
     private static int exponent(double bytes) {
         if (bytes < BYTE_BASE) {
-            return 0;
+            return 1;
         }
 
         return (int) (Math.log(bytes) / Math.log(BYTE_BASE));
