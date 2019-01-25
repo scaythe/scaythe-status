@@ -38,13 +38,6 @@ public class ModuleManager implements SmartLifecycle {
 
     @Override
     public void start() {
-//        StatusHeader header = StatusHeaderImmutable.builder().version(1).clickEvents(true).build();
-//
-//        writer.write(header);
-
-        System.out.println("{\"version\": 1, \"click_events\": true}");
-        System.out.println("[");
-
         disposable = Flux.combineLatest(modules.stream()
                 .map(Module::stream)
                 .collect(Collectors.toList()), this::combine)

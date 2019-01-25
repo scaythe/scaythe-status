@@ -1,17 +1,25 @@
 package com.scaythe.status.input;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.stream.JsonReader;
 import com.scaythe.status.ModuleManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.Optional;
-import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @Component
 public class EventReader implements SmartLifecycle {
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Gson json;
@@ -38,23 +46,27 @@ public class EventReader implements SmartLifecycle {
     }
 
     private void read() {
-        try (Scanner scan = new Scanner(System.in)) {
-            while (!Thread.interrupted() && scan.hasNextLine()) {
-                String line = scan.nextLine();
+        try (JsonReader reader = json.newJsonReader(new InputStreamReader(System.in))) {
+            reader.beginArray();
 
-                match(line.replaceFirst("^,", "")).ifPresent(moduleManager::event);
+            while (reader.hasNext()) {
+                readEvent(reader).ifPresent(moduleManager::event);
             }
+        } catch (IOException e) {
+            log.error("problem reading stdin : {} : {}", e.getClass().getName(), e.getMessage());
+            log.error("", e);
         }
     }
 
-    private Optional<ClickEvent> match(String line) {
+    private Optional<ClickEvent> readEvent(JsonReader reader) {
         try {
-            ClickEvent event = json.fromJson(line, ClickEvent.class);
-
-            if (event.name().isPresent()) {
-                return Optional.of(event);
-            }
-        } catch (Exception e) {
+            return Optional.ofNullable(json.fromJson(reader, ClickEvent.class));
+        } catch (JsonIOException e) {
+            log.error("problem reading json input : {} : {}", e.getClass().getName(), e.getMessage());
+            log.error("", e);
+        } catch (JsonSyntaxException e) {
+            log.error("malformed json input : {} : {}", e.getClass().getName(), e.getMessage());
+            log.error("", e);
         }
 
         return Optional.empty();
