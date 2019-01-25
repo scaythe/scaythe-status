@@ -3,7 +3,6 @@ package com.scaythe.status.write;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonWriter;
-import jdk.internal.jline.internal.Log;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -26,32 +25,42 @@ public class StatusWriter {
     public StatusWriter(Gson gson) throws IOException {
         this.gson = gson;
         this.writer = new OutputStreamWriter(System.out);
+
+        final StatusHeaderImmutable header = StatusHeaderImmutable
+                .builder()
+                .version(1)
+                .clickEvents(true)
+                .build();
+
+        writeHeader(header, gson, writer);
+
         this.jsonWriter = gson.newJsonWriter(this.writer);
-        this.jsonWriter.setLenient(true);
-
-        StatusHeader header = StatusHeaderImmutable.builder().version(1).clickEvents(true).build();
-
-        write(header);
-
-        jsonWriter.beginArray();
-        writer.append('\n');
-    }
-
-    private void write(StatusHeader header) throws IOException {
-        gson.toJson(header, StatusHeader.class, jsonWriter);
+        this.jsonWriter.beginArray();
         writer.append('\n');
         jsonWriter.flush();
     }
 
+    private void writeHeader(StatusHeaderImmutable header, Gson gson, Writer writer) {
+        try {
+            gson.toJson(header, writer);
+            writer.append('\n');
+            writer.flush();
+        } catch (IOException e) {
+            log.error("problem writing header to std out : {} : {}", e.getClass(), e.getMessage());
+            log.error("", e);
+        }
+    }
+
     public void write(List<ModuleData> data) {
-        Type t = new TypeToken<List<ModuleData>>() {}.getType();
+        Type t = new TypeToken<List<ModuleData>>() {
+        }.getType();
 
         try {
             gson.toJson(data, t, jsonWriter);
             writer.append('\n');
             jsonWriter.flush();
         } catch (IOException e) {
-            log.error("problem writing to std out : {} : {}", e.getClass(), e.getMessage());
+            log.error("problem writing data to std out : {} : {}", e.getClass(), e.getMessage());
             log.error("", e);
         }
     }
