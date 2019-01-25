@@ -1,5 +1,6 @@
 package com.scaythe.status.input;
 
+import com.google.gson.Gson;
 import com.scaythe.status.ModuleManager;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
@@ -8,18 +9,16 @@ import java.util.Optional;
 import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Component
-public class Reader implements SmartLifecycle {
-    private static final Pattern namePattern = Pattern.compile("\"name\"\\s*:\\s*\"(.+?)\"");
-    private static final Pattern instancePattern = Pattern.compile("\"instance\"\\s*:\\s*\"(.+?)\"");
+public class EventReader implements SmartLifecycle {
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final Gson json;
     private final ModuleManager moduleManager;
 
-    public Reader(ModuleManager moduleManager) {
+    public EventReader(Gson json, ModuleManager moduleManager) {
+        this.json = json;
         this.moduleManager = moduleManager;
     }
 
@@ -43,23 +42,19 @@ public class Reader implements SmartLifecycle {
             while (!Thread.interrupted() && scan.hasNextLine()) {
                 String line = scan.nextLine();
 
-                match(line).ifPresent(moduleManager::event);
+                match(line.replaceFirst("^,", "")).ifPresent(moduleManager::event);
             }
         }
     }
 
     private Optional<ClickEvent> match(String line) {
-        Optional<String> name = match(line, namePattern);
-        Optional<String> instance = match(line, instancePattern);
+        try {
+            ClickEvent event = json.fromJson(line, ClickEvent.class);
 
-        return name.map(n -> new ClickEvent(n, instance.orElse(null)));
-    }
-
-    private Optional<String> match(String line, Pattern p) {
-        Matcher m = p.matcher(line);
-
-        if (m.find()) {
-            return Optional.of(m.group(1));
+            if (event.name().isPresent()) {
+                return Optional.of(event);
+            }
+        } catch (Exception e) {
         }
 
         return Optional.empty();

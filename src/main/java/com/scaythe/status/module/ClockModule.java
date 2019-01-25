@@ -1,5 +1,9 @@
 package com.scaythe.status.module;
 
+import com.scaythe.status.module.config.SamplingModuleConfigTemplate;
+import com.scaythe.status.write.ModuleData;
+import com.scaythe.status.write.ModuleDataImmutable;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -8,16 +12,25 @@ import java.util.List;
 
 public class ClockModule extends SamplingModule<Instant> {
 
-    private static final String NAME = "clock";
-
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    public ClockModule(Runnable update) {
-        this(null, update);
+    public ClockModule(SamplingModuleConfigTemplate config) {
+        super(config);
     }
 
-    public ClockModule(String instance, Runnable update) {
-        super(Duration.ofMillis(100), 1, NAME, instance, null, update);
+    @Override
+    public String defaultName() {
+        return "clock";
+    }
+
+    @Override
+    public Duration defaultSampleRate() {
+        return Duration.ofMillis(20);
+    }
+
+    @Override
+    public int defaultSize() {
+        return 1;
     }
 
     @Override
@@ -27,6 +40,9 @@ public class ClockModule extends SamplingModule<Instant> {
 
     @Override
     public ModuleData reduce(List<Instant> samples) {
-        return new ModuleData(formatter.format(samples.get(0).atZone(ZoneId.systemDefault())));
+        return ModuleDataImmutable.builder()
+                .fullText(formatter.format(samples.get(samples.size() - 1).atZone(ZoneId.systemDefault())))
+                .name(name())
+                .build();
     }
 }

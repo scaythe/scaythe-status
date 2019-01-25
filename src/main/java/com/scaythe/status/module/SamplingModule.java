@@ -1,64 +1,49 @@
 package com.scaythe.status.module;
 
-import reactor.core.Disposable;
+import com.scaythe.status.module.config.SamplingModuleConfigTemplate;
+import com.scaythe.status.write.ModuleData;
 import reactor.core.publisher.Flux;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.Queue;
 
-public abstract class SamplingModule<T> extends StatusModule {
+public abstract class SamplingModule<T> extends Module {
 
     private final Duration sampleRate;
-    private final Queue<T> samples;
+    private final int size;
 
-    private Disposable disposable = null;
+    public SamplingModule(SamplingModuleConfigTemplate config) {
+        super(config);
 
-    public SamplingModule(
-            Duration sampleRate,
-            int size,
-            String name,
-            String instance,
-            String markup,
-            Runnable update) {
-        super(name, instance, markup, update);
-
-        this.samples = new LimitedQueue<>(size);
-        this.sampleRate = sampleRate;
+        this.sampleRate = config.sampleRate().orElseGet(this::defaultSampleRate);
+        this.size = config.size().orElseGet(this::defaultSize);
     }
 
     @Override
-    public void start() {
-        if (disposable != null) {
-            return;
-        }
+    public Flux<ModuleData> data() {
+        Collection<T> samples = new LimitedQueue<>(size);
 
-        disposable = Flux.interval(sampleRate)
+        return Flux.interval(sampleRate)
                 .map(l -> sample())
                 .doOnNext(samples::add)
-                .map(s -> reduce())
-                .doOnNext(this::update)
-                .subscribe();
+                .map(s -> reduce(new ArrayList<>(samples)));
     }
 
-    @Override
-    public void stop() {
-        if (disposable != null) {
-            disposable.dispose();
-        }
+    public Duration sampleRate() {
+        return sampleRate;
     }
 
-    @Override
-    public boolean isRunning() {
-        return disposable != null;
+    public int size() {
+        return size;
     }
+
+    public abstract Duration defaultSampleRate();
+
+    public abstract int defaultSize();
 
     public abstract T sample();
-
-    private ModuleData reduce() {
-        return reduce(new ArrayList<>(samples));
-    }
 
     public abstract ModuleData reduce(List<T> samples);
 }

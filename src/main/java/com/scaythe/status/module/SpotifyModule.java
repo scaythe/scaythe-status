@@ -1,6 +1,9 @@
 package com.scaythe.status.module;
 
 import com.scaythe.status.input.ClickEvent;
+import com.scaythe.status.module.config.ModuleConfigTemplate;
+import com.scaythe.status.write.ModuleData;
+import com.scaythe.status.write.ModuleDataImmutable;
 import org.freedesktop.DBus;
 import org.freedesktop.dbus.DBusMap;
 import org.freedesktop.dbus.connections.impl.DBusConnection;
@@ -8,16 +11,17 @@ import org.freedesktop.dbus.exceptions.DBusException;
 import org.freedesktop.dbus.interfaces.Properties;
 import org.freedesktop.dbus.types.Variant;
 import org.mpris.MediaPlayer2.Player;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-public class SpotifyModule extends StatusModule {
-
-    private static final String NAME = "spotify";
+public class SpotifyModule extends Module {
 
     private static final String DBUS_BUS_NAME = "org.freedesktop.DBus";
     private static final String DBUS_PATH = "/org/freedesktop/DBus";
@@ -26,19 +30,21 @@ public class SpotifyModule extends StatusModule {
 
     private DBusConnection connection = null;
     private Player player = null;
+    private Consumer<ModuleData> update;
 
-    public SpotifyModule(Runnable update) {
-        this(null, update);
-    }
-
-    public SpotifyModule(String instance, Runnable update) {
-        super(NAME, instance, null, update);
+    public SpotifyModule(ModuleConfigTemplate config) {
+        super(config);
     }
 
     @Override
-    public void start() {
+    public String defaultName() {
+        return "spotify";
+    }
+
+    @Override
+    public Flux<ModuleData> data() {
         if (connection != null) {
-            return;
+            throw new RuntimeException();
         }
 
         String address = System.getenv("DBUS_SESSION_BUS_ADDRESS");
@@ -46,7 +52,7 @@ public class SpotifyModule extends StatusModule {
         try {
             connection = DBusConnection.getConnection(address);
         } catch (DBusException e) {
-            return;
+            throw new RuntimeException();
         }
 
         try {
@@ -54,15 +60,34 @@ public class SpotifyModule extends StatusModule {
 
             registerSpotifyStartStopListener();
 
-            if (dbus.NameHasOwner(SPOTIFY_BUS_NAME)) {
-                String spotifyName = dbus.GetNameOwner(SPOTIFY_BUS_NAME);
-
-                spotifyRunning(spotifyName);
-            }
+            return Flux.<ModuleData>create(s -> emitter(s, dbus)).doFinally(s -> stop());
         } catch (DBusException e) {
             e.printStackTrace();
 
             stop();
+        }
+
+        return Flux.error(new RuntimeException());
+    }
+
+    private void emitter(FluxSink<ModuleData> sink, DBus dbus) {
+        update = sink::next;
+
+        startupStatus(dbus);
+    }
+
+    private void startupStatus(DBus dbus) {
+        if (dbus.NameHasOwner(SPOTIFY_BUS_NAME)) {
+            String spotifyName = dbus.GetNameOwner(SPOTIFY_BUS_NAME);
+
+            spotifyRunning(spotifyName);
+        }
+    }
+
+    @Override
+    public void event(ClickEvent event) {
+        if (player != null) {
+            player.PlayPause();
         }
     }
 
@@ -96,23 +121,38 @@ public class SpotifyModule extends StatusModule {
     private void spotifyStopping(String spotifyName) throws DBusException {
         player = null;
 
-        connection.removeSigHandler(Properties.PropertiesChanged.class, spotifyName, this::propertiesChanged);
-        update(new ModuleData(""));
+        connection.removeSigHandler(Properties.PropertiesChanged.class,
+                spotifyName,
+                this::propertiesChanged);
+
+        ModuleData data = ModuleDataImmutable.builder().fullText("").name(name()).build();
+
+        update.accept(data);
     }
 
-    private void spotifyRunning(String spotifyName) throws DBusException {
-        connection.addSigHandler(Properties.PropertiesChanged.class, spotifyName, this::propertiesChanged);
-        currentStatus();
+    private void spotifyRunning(String spotifyName) {
+        try {
+            connection.addSigHandler(Properties.PropertiesChanged.class,
+                    spotifyName,
+                    this::propertiesChanged);
+            currentStatus();
 
-        player = connection.getPeerRemoteObject(SPOTIFY_BUS_NAME, SPOTIFY_PATH, Player.class);
+            player = connection.getPeerRemoteObject(SPOTIFY_BUS_NAME, SPOTIFY_PATH, Player.class);
+        } catch (DBusException e) {
+            e.printStackTrace();
+        }
     }
 
-    private void currentStatus() throws DBusException {
-        Properties props = connection.getRemoteObject(SPOTIFY_BUS_NAME,
-                SPOTIFY_PATH,
-                Properties.class);
+    private void currentStatus() {
+        try {
+            Properties props = connection.getRemoteObject(SPOTIFY_BUS_NAME,
+                    SPOTIFY_PATH,
+                    Properties.class);
 
-        update(props.GetAll(Player.class.getName()));
+            update(props.GetAll(Player.class.getName()));
+        } catch (DBusException e) {
+            e.printStackTrace();
+        }
     }
 
     private void propertiesChanged(Properties.PropertiesChanged p) {
@@ -127,9 +167,15 @@ public class SpotifyModule extends StatusModule {
 
         String text = song + " - " + artist;
 
-        update(playbackStatus(map).flatMap(this::color)
-                .map(c -> new ModuleData(text, c))
-                .orElseGet(() -> new ModuleData(text)));
+        ModuleData data = playbackStatus(map).flatMap(this::color)
+                .map(c -> ModuleDataImmutable.builder()
+                        .fullText(text)
+                        .name(name())
+                        .color(c)
+                        .build())
+                .orElseGet(() -> ModuleDataImmutable.builder().fullText(text).name(name()).build());
+
+        update.accept(data);
     }
 
     private Optional<String> color(String status) {
@@ -145,7 +191,9 @@ public class SpotifyModule extends StatusModule {
 
     private Map<String, String> metadata(Map<String, Variant<?>> map) {
         return Optional.ofNullable(map.get("Metadata"))
-                .filter(v -> v.getType().getTypeName().startsWith("org.freedesktop.dbus.types.DBusMapType"))
+                .filter(v -> v.getType()
+                        .getTypeName()
+                        .startsWith("org.freedesktop.dbus.types.DBusMapType"))
                 .map(Variant::getValue)
                 .map(DBusMap.class::cast)
                 .map(this::toMap)
@@ -153,7 +201,9 @@ public class SpotifyModule extends StatusModule {
     }
 
     private Map<String, String> toMap(DBusMap<String, Variant<?>> map) {
-        return map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> variant(e.getValue())));
+        return map.entrySet()
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> variant(e.getValue())));
     }
 
     private Optional<String> playbackStatus(Map<String, Variant<?>> map) {
@@ -172,22 +222,9 @@ public class SpotifyModule extends StatusModule {
         return String.join(", ", v.getValue());
     }
 
-    @Override
-    public void event(ClickEvent event) {
-        if (player != null) {
-            player.PlayPause();
-        }
-    }
-
-    @Override
     public void stop() {
         if (connection != null) {
             connection.disconnect();
         }
-    }
-
-    @Override
-    public boolean isRunning() {
-        return connection != null;
     }
 }

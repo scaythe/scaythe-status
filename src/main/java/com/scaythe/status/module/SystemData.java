@@ -1,38 +1,17 @@
 package com.scaythe.status.module;
 
-public class SystemData {
+import org.immutables.value.Value;
 
-    private final double cpu;
-    private final double memory;
-    private final double swap;
-    private final long netDown;
-    private final long netUp;
+@Value.Immutable
+public interface SystemData {
 
-    public SystemData(double cpu, double memory, double swap, long netDown, long netUp) {
-        this.cpu = cpu;
-        this.memory = memory;
-        this.swap = swap;
-        this.netUp = netUp;
-        this.netDown = netDown;
-    }
+    double cpu();
 
-    public double cpu() {
-        return cpu;
-    }
+    double memory();
 
-    public double memory() {
-        return memory;
-    }
+    double swap();
 
-    public double swap() {
-        return swap;
-    }
+    long netDown();
 
-    public long netDown() {
-        return netDown;
-    }
-
-    public long netUp() {
-        return netUp;
-    }
+    long netUp();
 }

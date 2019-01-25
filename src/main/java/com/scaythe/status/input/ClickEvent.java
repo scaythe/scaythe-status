@@ -1,26 +1,34 @@
 package com.scaythe.status.input;
 
+import com.google.gson.annotations.SerializedName;
+import org.immutables.gson.Gson;
+import org.immutables.value.Value;
+
 import java.util.Optional;
+import java.util.Set;
 
-public class ClickEvent {
+@Value.Immutable
+@Gson.TypeAdapters
+public interface ClickEvent {
+    Optional<String> name();
 
-    private final String name;
-    private final String instance;
+    Optional<String> instance();
 
-    public ClickEvent(String name) {
-        this(name, null);
-    }
+    int button();
 
-    public ClickEvent(String name, String instance) {
-        this.name = name;
-        this.instance = instance;
-    }
+    int x();
 
-    public String name() {
-        return name;
-    }
+    int y();
 
-    public Optional<String> instance() {
-        return Optional.ofNullable(instance);
-    }
+    @SerializedName("relative_x")
+    int relativeX();
+
+    @SerializedName("relative_y")
+    int relativeY();
+
+    int width();
+
+    int height();
+
+    Set<String> modifiers();
 }
