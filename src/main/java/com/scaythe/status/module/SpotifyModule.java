@@ -3,7 +3,6 @@ package com.scaythe.status.module;
 import com.scaythe.status.input.ClickEvent;
 import com.scaythe.status.module.config.ModuleConfigTemplate;
 import com.scaythe.status.write.ModuleData;
-import com.scaythe.status.write.ModuleDataImmutable;
 import org.freedesktop.DBus;
 import org.freedesktop.dbus.DBusMap;
 import org.freedesktop.dbus.connections.impl.DBusConnection;
@@ -13,6 +12,7 @@ import org.freedesktop.dbus.types.Variant;
 import org.mpris.MediaPlayer2.Player;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.Collections;
 import java.util.List;
@@ -29,8 +29,8 @@ public class SpotifyModule extends Module {
     private static final String SPOTIFY_PATH = "/org/mpris/MediaPlayer2";
 
     private DBusConnection connection = null;
+    private Consumer<ModuleData> update = null;
     private Player player = null;
-    private Consumer<ModuleData> update;
 
     public SpotifyModule(ModuleConfigTemplate config) {
         super(config);
@@ -60,7 +60,8 @@ public class SpotifyModule extends Module {
 
             registerSpotifyStartStopListener();
 
-            return Flux.<ModuleData>create(s -> emitter(s, dbus)).doFinally(s -> stop());
+            return Flux.<ModuleData>create(s -> emitter(s, dbus)).subscribeOn(Schedulers.parallel())
+                    .doFinally(s -> stop());
         } catch (DBusException e) {
             e.printStackTrace();
 
@@ -125,7 +126,7 @@ public class SpotifyModule extends Module {
                 spotifyName,
                 this::propertiesChanged);
 
-        ModuleData data = ModuleDataImmutable.builder().fullText("").name(name()).build();
+        ModuleData data = ModuleData.empty(name());
 
         update.accept(data);
     }
@@ -168,12 +169,8 @@ public class SpotifyModule extends Module {
         String text = song + " - " + artist;
 
         ModuleData data = playbackStatus(map).flatMap(this::color)
-                .map(c -> ModuleDataImmutable.builder()
-                        .fullText(text)
-                        .name(name())
-                        .color(c)
-                        .build())
-                .orElseGet(() -> ModuleDataImmutable.builder().fullText(text).name(name()).build());
+                .map(c -> ModuleData.ofColor(text, c, name()))
+                .orElseGet(() -> ModuleData.of(text, name()));
 
         update.accept(data);
     }

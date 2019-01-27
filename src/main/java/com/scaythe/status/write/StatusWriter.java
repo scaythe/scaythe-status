@@ -26,7 +26,7 @@ public class StatusWriter {
         this.gson = gson;
         this.writer = new OutputStreamWriter(System.out);
 
-        final StatusHeaderImmutable header = StatusHeaderImmutable
+        StatusHeader header = StatusHeaderImmutable
                 .builder()
                 .version(1)
                 .clickEvents(true)
@@ -40,7 +40,7 @@ public class StatusWriter {
         jsonWriter.flush();
     }
 
-    private void writeHeader(StatusHeaderImmutable header, Gson gson, Writer writer) {
+    private void writeHeader(StatusHeader header, Gson gson, Writer writer) {
         try {
             gson.toJson(header, writer);
             writer.append('\n');
@@ -52,8 +52,7 @@ public class StatusWriter {
     }
 
     public void write(List<ModuleData> data) {
-        Type t = new TypeToken<List<ModuleData>>() {
-        }.getType();
+        Type t = new TypeToken<List<ModuleData>>() {}.getType();
 
         try {
             gson.toJson(data, t, jsonWriter);

@@ -6,7 +6,6 @@ import com.scaythe.status.markup.PangoMarkup;
 import com.scaythe.status.module.config.SamplingModuleConfigTemplate;
 import com.scaythe.status.module.sub.Submodule;
 import com.scaythe.status.write.ModuleData;
-import com.scaythe.status.write.ModuleDataImmutable;
 import oshi.SystemInfo;
 import oshi.hardware.NetworkIF;
 
@@ -99,7 +98,7 @@ public class SystemModule extends SamplingModule<SystemData> {
                 .map(s -> s.format(avg))
                 .collect(Collectors.joining("<span fallback=\"false\"> </span>"));
 
-        return ModuleDataImmutable.builder().fullText(submodulesText).name(name()).markup(MARKUP).build();
+        return ModuleData.ofMarkup(submodulesText, MARKUP, name());
     }
 
     private String percent(double d) {

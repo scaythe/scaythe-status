@@ -1,8 +1,11 @@
 package com.scaythe.status;
 
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.TypeAdapterFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 
 import java.util.ServiceLoader;
@@ -11,11 +14,12 @@ import java.util.ServiceLoader;
 public class ScaytheStatusApp {
 
     public static void main(String[] args) {
-        SpringApplication.run(ScaytheStatusApp.class, args);
-
-        try {
-            Thread.currentThread().join();
-        } catch (InterruptedException e) {
+        try (ConfigurableApplicationContext ignored = SpringApplication.run(ScaytheStatusApp.class,
+                args)) {
+            try {
+                Thread.currentThread().join();
+            } catch (InterruptedException e) {
+            }
         }
     }
 

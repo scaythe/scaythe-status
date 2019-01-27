@@ -39,4 +39,20 @@ public interface ModuleData {
     Optional<String> separatorBlockWidth();
 
     Optional<String> markup();
+
+    static ModuleData of(String fullText, String name) {
+        return ModuleDataImmutable.builder().fullText(fullText).name(name).build();
+    }
+
+    static ModuleData ofColor(String fullText, String color, String name) {
+        return ModuleDataImmutable.builder().fullText(fullText).name(name).color(color).build();
+    }
+
+    static ModuleData ofMarkup(String fullText, String markup, String name) {
+        return ModuleDataImmutable.builder().fullText(fullText).name(name).markup(markup).build();
+    }
+
+    static ModuleData empty(String name) {
+        return of("", name);
+    }
 }

@@ -4,65 +4,53 @@ import com.google.gson.Gson;
 import com.google.gson.JsonIOException;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.stream.JsonReader;
-import com.scaythe.status.ModuleManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 @Component
-public class EventReader implements SmartLifecycle {
+public class EventReader {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Gson json;
-    private final ModuleManager moduleManager;
 
-    public EventReader(Gson json, ModuleManager moduleManager) {
+    public EventReader(Gson json) {
         this.json = json;
-        this.moduleManager = moduleManager;
     }
 
-    @Override
-    public void start() {
-        executor.execute(this::read);
+    public Flux<ClickEvent> events() {
+        return Flux.create(this::read).subscribeOn(Schedulers.parallel());
     }
 
-    @Override
-    public void stop() {
-        executor.shutdownNow();
-    }
-
-    @Override
-    public boolean isRunning() {
-        return false;
-    }
-
-    private void read() {
+    private void read(FluxSink<ClickEvent> sink) {
         try (JsonReader reader = json.newJsonReader(new InputStreamReader(System.in))) {
             reader.beginArray();
 
-            while (reader.hasNext()) {
-                readEvent(reader).ifPresent(moduleManager::event);
+            while (!sink.isCancelled() && reader.hasNext()) {
+                readEvent(reader).ifPresent(sink::next);
             }
         } catch (IOException e) {
-            log.error("problem reading stdin : {} : {}", e.getClass().getName(), e.getMessage());
-            log.error("", e);
+            sink.error(e);
         }
+
+        sink.complete();
     }
 
     private Optional<ClickEvent> readEvent(JsonReader reader) {
         try {
             return Optional.ofNullable(json.fromJson(reader, ClickEvent.class));
         } catch (JsonIOException e) {
-            log.error("problem reading json input : {} : {}", e.getClass().getName(), e.getMessage());
+            log.error("problem reading json input : {} : {}",
+                    e.getClass().getName(),
+                    e.getMessage());
             log.error("", e);
         } catch (JsonSyntaxException e) {
             log.error("malformed json input : {} : {}", e.getClass().getName(), e.getMessage());
