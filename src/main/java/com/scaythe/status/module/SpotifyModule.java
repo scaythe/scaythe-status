@@ -51,8 +51,8 @@ public class SpotifyModule extends Module {
 
         try {
             connection = DBusConnection.getConnection(address);
-        } catch (DBusException e) {
-            throw new RuntimeException();
+        } catch (DBusException | NullPointerException e) {
+            return Flux.empty();
         }
 
         try {
@@ -68,7 +68,7 @@ public class SpotifyModule extends Module {
             stop();
         }
 
-        return Flux.error(new RuntimeException());
+        return Flux.empty();
     }
 
     private void emitter(FluxSink<ModuleData> sink, DBus dbus) {
