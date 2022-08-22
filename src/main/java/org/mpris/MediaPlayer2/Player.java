@@ -4,5 +4,5 @@ import org.freedesktop.dbus.interfaces.DBusInterface;
 
 public interface Player extends DBusInterface {
 
-    void PlayPause();
+  void PlayPause();
 }

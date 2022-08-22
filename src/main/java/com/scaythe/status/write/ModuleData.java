@@ -1,58 +1,50 @@
 package com.scaythe.status.write;
 
 import com.google.gson.annotations.SerializedName;
-import org.immutables.gson.Gson;
-import org.immutables.value.Value;
-
 import java.util.Optional;
+import lombok.Builder;
 
-@Value.Immutable
-@Gson.TypeAdapters
-public interface ModuleData {
+public record ModuleData(
+    @SerializedName("full_text") String fullText,
+    @SerializedName("short_text") Optional<String> shortText,
+    Optional<String> color,
+    Optional<String> background,
+    Optional<String> border,
+    @SerializedName("min_width") Optional<String> minWidth,
+    Optional<String> align,
+    Optional<String> name,
+    Optional<String> instance,
+    Optional<Boolean> urgent,
+    Optional<Boolean> separator,
+    @SerializedName("separator_block_width") Optional<String> separatorBlockWidth,
+    Optional<String> markup) {
 
-    @SerializedName("full_text")
-    String fullText();
+  @Builder
+  public ModuleData {
+    // TODO remove when no longer needed for intellij lombok plugin, move @Builder to top level
+  }
 
-    @SerializedName("short_text")
-    Optional<String> shortText();
+  public static ModuleData of(String fullText, String name) {
+    return ModuleData.builder().fullText(fullText).name(Optional.of(name)).build();
+  }
 
-    Optional<String> color();
+  public static ModuleData ofColor(String fullText, String color, String name) {
+    return ModuleData.builder()
+        .fullText(fullText)
+        .name(Optional.of(name))
+        .color(Optional.of(color))
+        .build();
+  }
 
-    Optional<String> background();
+  public static ModuleData ofMarkup(String fullText, String markup, String name) {
+    return ModuleData.builder()
+        .fullText(fullText)
+        .name(Optional.of(name))
+        .markup(Optional.of(markup))
+        .build();
+  }
 
-    Optional<String> border();
-
-    @SerializedName("min_width")
-    Optional<String> minWidth();
-
-    Optional<String> align();
-
-    Optional<String> name();
-
-    Optional<String> instance();
-
-    Optional<Boolean> urgent();
-
-    Optional<Boolean> separator();
-
-    @SerializedName("separator_block_width")
-    Optional<String> separatorBlockWidth();
-
-    Optional<String> markup();
-
-    static ModuleData of(String fullText, String name) {
-        return ModuleDataImmutable.builder().fullText(fullText).name(name).build();
-    }
-
-    static ModuleData ofColor(String fullText, String color, String name) {
-        return ModuleDataImmutable.builder().fullText(fullText).name(name).color(color).build();
-    }
-
-    static ModuleData ofMarkup(String fullText, String markup, String name) {
-        return ModuleDataImmutable.builder().fullText(fullText).name(name).markup(markup).build();
-    }
-
-    static ModuleData empty(String name) {
-        return of("", name);
-    }
+  public static ModuleData empty(String name) {
+    return of("", name);
+  }
 }

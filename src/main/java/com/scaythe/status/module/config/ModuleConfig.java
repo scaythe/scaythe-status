@@ -1,11 +1,10 @@
 package com.scaythe.status.module.config;
 
-import org.immutables.value.Value;
+import java.util.Optional;
 
-@Value.Immutable
-public interface ModuleConfig extends ModuleConfigTemplate {
+public record ModuleConfig(Optional<String> name, Optional<String> instance) {
 
-    static ModuleConfig defaults() {
-        return ModuleConfigImmutable.builder().build();
-    }
+  public static ModuleConfig defaults() {
+    return new ModuleConfig(Optional.empty(), Optional.empty());
+  }
 }
