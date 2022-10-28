@@ -7,6 +7,10 @@ public class FormatBytes {
   private static final double BYTE_BASE = 1024d;
   private static final String BYTE_FORMAT = "%6.1f %-5s";
 
+  public static String format(long bytes) {
+    return format((double) bytes);
+  }
+
   public static String format(double bytes) {
     final int exponent = exponent(bytes);
     final String unit = BYTE_UNITS[exponent];

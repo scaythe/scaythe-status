@@ -4,7 +4,6 @@ import com.scaythe.status.input.ClickEvent;
 import com.scaythe.status.module.config.ModuleConfig;
 import com.scaythe.status.write.ModuleData;
 import java.util.Optional;
-import reactor.core.publisher.Flux;
 
 public abstract class Module {
 
@@ -26,7 +25,7 @@ public abstract class Module {
 
   public abstract String defaultName();
 
-  public abstract Flux<ModuleData> data();
+  public abstract ModuleData data();
 
   public void event(ClickEvent event) {}
 }

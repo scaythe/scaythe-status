@@ -7,7 +7,6 @@ import com.scaythe.status.module.config.SamplingModuleConfig;
 import com.scaythe.status.module.sub.Submodule;
 import com.scaythe.status.write.ModuleData;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -16,6 +15,7 @@ import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
 import oshi.SystemInfo;
 import oshi.hardware.NetworkIF;
+import oshi.software.os.OSFileStore;
 
 public class SystemModule extends SamplingModule<SystemData> {
 
@@ -24,19 +24,23 @@ public class SystemModule extends SamplingModule<SystemData> {
   private final SystemInfo systemInfo = new SystemInfo();
   private final AtomicReference<long[]> cpuTicks = new AtomicReference<>();
 
-  private final List<Submodule<SystemData, ?>> submodules = new ArrayList<>();
+  private final List<Submodule<SystemData, ?>> submodules;
 
   public SystemModule(SamplingModuleConfig config) {
     super(config);
 
-    submodules.add(new Submodule<>("\uF2DB", SystemData::cpu, this::percent, this::percentColors));
-    submodules.add(
-        new Submodule<>("\uF0C9", SystemData::memory, this::percent, this::percentColors));
-    submodules.add(new Submodule<>("\uF0EC", SystemData::swap, this::percent, this::swapColors));
-    submodules.add(
-        new Submodule<>("\uF019", SystemData::netDown, this::avgBytes, d -> Optional.empty()));
-    submodules.add(
-        new Submodule<>("\uF093", SystemData::netUp, this::avgBytes, d -> Optional.empty()));
+    submodules =
+        List.of(
+            new Submodule<>("\uF2DB", SystemData::cpu, FormatPercent::format, this::percentColors),
+            new Submodule<>(
+                "\uF0C9", SystemData::memory, FormatPercent::format, this::percentColors),
+            new Submodule<>("\uF0EC", SystemData::swap, FormatPercent::format, this::swapColors),
+            new Submodule<>(
+                "\uF2DB", SystemData::disks, FormatPercent::format, this::percentColors),
+            new Submodule<>(
+                "\uF019", SystemData::netDown, FormatBytes::format, d -> Optional.<String>empty()),
+            new Submodule<>(
+                "\uF093", SystemData::netUp, FormatBytes::format, d -> Optional.<String>empty()));
   }
 
   @Override
@@ -60,6 +64,7 @@ public class SystemModule extends SamplingModule<SystemData> {
         .cpu(cpu())
         .memory(memory())
         .swap(swap())
+        .disks(disks())
         .netDown(netDown())
         .netUp(netUp())
         .build();
@@ -90,6 +95,19 @@ public class SystemModule extends SamplingModule<SystemData> {
     return (double) used / (double) total;
   }
 
+  private List<Double> disks() {
+    return systemInfo.getOperatingSystem().getFileSystem().getFileStores().stream()
+        .map(this::disk)
+        .toList();
+  }
+
+  private double disk(OSFileStore osFileStore) {
+    long total = osFileStore.getTotalSpace();
+    long used = total - osFileStore.getFreeSpace();
+
+    return (double) used / (double) total;
+  }
+
   private long netDown() {
     return systemInfo.getHardware().getNetworkIFs().stream()
         .mapToLong(NetworkIF::getBytesRecv)
@@ -114,10 +132,6 @@ public class SystemModule extends SamplingModule<SystemData> {
     return ModuleData.ofMarkup(submodulesText, MARKUP, name());
   }
 
-  private String percent(double d) {
-    return FormatPercent.format(d);
-  }
-
   private Optional<String> percentColors(double d) {
     if (d < .5d) {
       return Optional.of("lime");
@@ -136,10 +150,6 @@ public class SystemModule extends SamplingModule<SystemData> {
     } else {
       return Optional.of("red");
     }
-  }
-
-  private String avgBytes(long bytes) {
-    return FormatBytes.format(bytes / (double) size());
   }
 
   private SystemData reduceData(List<SystemData> samples) {
