@@ -1,12 +1,12 @@
 package com.scaythe.status.input;
 
 import com.google.gson.annotations.SerializedName;
-import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 public record ClickEvent(
-    Optional<String> name,
-    Optional<String> instance,
+    @Nullable String name,
+    @Nullable String instance,
     int button,
     int x,
     int y,

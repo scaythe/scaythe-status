@@ -1,47 +1,36 @@
 package com.scaythe.status.write;
 
 import com.google.gson.annotations.SerializedName;
-import java.util.Optional;
-import lombok.Builder;
+import org.jspecify.annotations.Nullable;
 
 public record ModuleData(
     @SerializedName("full_text") String fullText,
-    @SerializedName("short_text") Optional<String> shortText,
-    Optional<String> color,
-    Optional<String> background,
-    Optional<String> border,
-    @SerializedName("min_width") Optional<String> minWidth,
-    Optional<String> align,
-    Optional<String> name,
-    Optional<String> instance,
-    Optional<Boolean> urgent,
-    Optional<Boolean> separator,
-    @SerializedName("separator_block_width") Optional<String> separatorBlockWidth,
-    Optional<String> markup) {
-
-  @Builder
-  public ModuleData {
-    // TODO remove when no longer needed for intellij lombok plugin, move @Builder to top level
-  }
+    @SerializedName("short_text") @Nullable String shortText,
+    @Nullable String color,
+    @Nullable String background,
+    @Nullable String border,
+    @SerializedName("min_width") @Nullable String minWidth,
+    @Nullable String align,
+    @Nullable String name,
+    @Nullable String instance,
+    @Nullable Boolean urgent,
+    @Nullable Boolean separator,
+    @SerializedName("separator_block_width") @Nullable String separatorBlockWidth,
+    @Nullable String markup) {
 
   public static ModuleData of(String fullText, String name) {
-    return ModuleData.builder().fullText(fullText).name(Optional.of(name)).build();
+    return new ModuleData(
+        fullText, null, null, null, null, null, null, name, null, null, null, null, null);
   }
 
   public static ModuleData ofColor(String fullText, String color, String name) {
-    return ModuleData.builder()
-        .fullText(fullText)
-        .name(Optional.of(name))
-        .color(Optional.of(color))
-        .build();
+    return new ModuleData(
+        fullText, null, color, null, null, null, null, name, null, null, null, null, null);
   }
 
   public static ModuleData ofMarkup(String fullText, String markup, String name) {
-    return ModuleData.builder()
-        .fullText(fullText)
-        .name(Optional.of(name))
-        .markup(Optional.of(markup))
-        .build();
+    return new ModuleData(
+        fullText, null, null, null, null, null, null, name, null, null, null, null, markup);
   }
 
   public static ModuleData empty(String name) {

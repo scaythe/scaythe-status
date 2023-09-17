@@ -6,54 +6,43 @@ import com.google.gson.JsonSyntaxException;
 import com.google.gson.stream.JsonReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.function.Consumer;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.flogger.Flogger;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
-import reactor.core.scheduler.Schedulers;
 
 @Component
+@RequiredArgsConstructor
+@Flogger
 public class EventReader {
-
-  private final Logger log = LoggerFactory.getLogger(getClass());
-
   private final Gson json;
 
-  public EventReader(Gson json) {
-    this.json = json;
-  }
-
-  public Flux<ClickEvent> events() {
-    return Flux.create(this::read).subscribeOn(Schedulers.parallel());
-  }
-
-  private void read(FluxSink<ClickEvent> sink) {
+  public void read(Consumer<ClickEvent> consumer) {
     try (JsonReader reader = json.newJsonReader(new InputStreamReader(System.in))) {
       reader.beginArray();
 
-      while (!sink.isCancelled() && reader.hasNext()) {
-        readEvent(reader).ifPresent(sink::next);
+      while (!Thread.interrupted() && reader.hasNext()) {
+        ClickEvent clickEvent = readEvent(reader);
+        if (clickEvent != null) consumer.accept(clickEvent);
       }
     } catch (IOException e) {
-      sink.error(e);
+      log.atSevere().withCause(e).log(
+          "problem reading json input : %s : %s", e.getClass().getName(), e.getMessage());
     }
-
-    sink.complete();
   }
 
-  private Optional<ClickEvent> readEvent(JsonReader reader) {
+  private @Nullable ClickEvent readEvent(JsonReader reader) {
     try {
-      return Optional.ofNullable(json.fromJson(reader, ClickEvent.class));
+      return json.fromJson(reader, ClickEvent.class);
     } catch (JsonIOException e) {
-      log.error("problem reading json input : {} : {}", e.getClass().getName(), e.getMessage());
-      log.error("", e);
+      log.atSevere().withCause(e).log(
+          "problem reading json input : %s : %s", e.getClass().getName(), e.getMessage());
     } catch (JsonSyntaxException e) {
-      log.error("malformed json input : {} : {}", e.getClass().getName(), e.getMessage());
-      log.error("", e);
+      log.atSevere().withCause(e).log(
+          "malformed json input : %s : %s", e.getClass().getName(), e.getMessage());
     }
 
-    return Optional.empty();
+    return null;
   }
 }

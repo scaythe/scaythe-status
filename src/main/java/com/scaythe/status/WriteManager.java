@@ -1,68 +1,60 @@
 package com.scaythe.status;
 
-import com.scaythe.status.module.Module;
+import static com.scaythe.status.ScaytheStatusApp.logError;
+
 import com.scaythe.status.write.ModuleData;
 import com.scaythe.status.write.StatusWriter;
-import java.time.Duration;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
-import reactor.core.Disposable;
-import reactor.core.publisher.Flux;
-import reactor.core.scheduler.Schedulers;
 
 @Component
 public class WriteManager implements SmartLifecycle {
-
-  private final ModuleManager moduleManager;
   private final StatusWriter writer;
+  private final BlockingQueue<List<ModuleData>> combinedDataQueue;
 
-  private Disposable disposable = null;
+  private final ExecutorService executor = Executors.newSingleThreadExecutor();
+  private boolean started = false;
 
   public WriteManager(ModuleManager moduleManager, StatusWriter writer) {
-    this.moduleManager = moduleManager;
+    combinedDataQueue = moduleManager.combinedDataQueue();
     this.writer = writer;
   }
 
-  @Override
-  public void start() {
-    disposable =
-        Flux.combineLatest(data(), this::combine)
-            .subscribeOn(Schedulers.parallel())
-            .sample(Duration.ofMillis(10))
-            .distinctUntilChanged()
-            .doOnNext(writer::write)
-            .onBackpressureLatest()
-            .subscribe();
-  }
+  private void writeCombinedData() {
+    writer.writeHeader();
 
-  private List<Flux<ModuleData>> data() {
-    return moduleManager.modules().stream().map(this::data).collect(Collectors.toList());
-  }
+    List<ModuleData> lastData = List.of();
 
-  private Flux<ModuleData> data(Module module) {
-    return module.data().startWith(ModuleData.empty(module.name()));
-  }
-
-  private List<ModuleData> combine(Object[] dataArray) {
-    return Stream.of(dataArray)
-        .filter(ModuleData.class::isInstance)
-        .map(ModuleData.class::cast)
-        .collect(Collectors.toList());
-  }
-
-  @Override
-  public void stop() {
-    if (disposable != null) {
-      disposable.dispose();
-      disposable = null;
+    while (!Thread.interrupted()) {
+      try {
+        List<ModuleData> data = combinedDataQueue.take();
+        if (!data.equals(lastData)) {
+          writer.write(data);
+          lastData = data;
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
     }
   }
 
   @Override
-  public boolean isRunning() {
-    return disposable != null;
+  public synchronized void start() {
+    executor.submit(logError(this::writeCombinedData));
+    started = true;
+  }
+
+  @Override
+  public synchronized void stop() {
+    executor.shutdownNow();
+  }
+
+  @Override
+  public synchronized boolean isRunning() {
+    return started && !executor.isTerminated();
   }
 }

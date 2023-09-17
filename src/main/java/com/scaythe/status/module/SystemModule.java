@@ -1,5 +1,7 @@
 package com.scaythe.status.module;
 
+import static java.util.stream.Collectors.joining;
+
 import com.scaythe.status.format.FormatBytes;
 import com.scaythe.status.format.FormatPercent;
 import com.scaythe.status.markup.PangoMarkup;
@@ -8,11 +10,10 @@ import com.scaythe.status.module.sub.Submodule;
 import com.scaythe.status.write.ModuleData;
 import java.time.Duration;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.ToDoubleFunction;
 import java.util.function.ToLongFunction;
-import java.util.stream.Collectors;
 import oshi.SystemInfo;
 import oshi.hardware.NetworkIF;
 import oshi.software.os.OSFileStore;
@@ -26,8 +27,8 @@ public class SystemModule extends SamplingModule<SystemData> {
 
   private final List<Submodule<SystemData, ?>> submodules;
 
-  public SystemModule(SamplingModuleConfig config) {
-    super(config);
+  public SystemModule(SamplingModuleConfig config, Consumer<ModuleData> output) {
+    super(config, output);
 
     submodules =
         List.of(
@@ -35,12 +36,9 @@ public class SystemModule extends SamplingModule<SystemData> {
             new Submodule<>(
                 "\uF0C9", SystemData::memory, FormatPercent::format, this::percentColors),
             new Submodule<>("\uF0EC", SystemData::swap, FormatPercent::format, this::swapColors),
-            new Submodule<>(
-                "\uF2DB", SystemData::disks, FormatPercent::format, this::percentColors),
-            new Submodule<>(
-                "\uF019", SystemData::netDown, FormatBytes::format, d -> Optional.<String>empty()),
-            new Submodule<>(
-                "\uF093", SystemData::netUp, FormatBytes::format, d -> Optional.<String>empty()));
+            new Submodule<>("\uF2DB", SystemData::disk, FormatPercent::format, this::percentColors),
+            new Submodule<>("\uF019", SystemData::netDown, FormatBytes::format, d -> null),
+            new Submodule<>("\uF093", SystemData::netUp, FormatBytes::format, d -> null));
   }
 
   @Override
@@ -60,14 +58,7 @@ public class SystemModule extends SamplingModule<SystemData> {
 
   @Override
   public SystemData sample() {
-    return SystemData.builder()
-        .cpu(cpu())
-        .memory(memory())
-        .swap(swap())
-        .disks(disks())
-        .netDown(netDown())
-        .netUp(netUp())
-        .build();
+    return new SystemData(cpu(), memory(), swap(), disk(), netDown(), netUp());
   }
 
   private double cpu() {
@@ -95,10 +86,12 @@ public class SystemModule extends SamplingModule<SystemData> {
     return (double) used / (double) total;
   }
 
-  private List<Double> disks() {
+  private double disk() {
     return systemInfo.getOperatingSystem().getFileSystem().getFileStores().stream()
+        .filter(s -> s.getMount().equals("/"))
+        .findFirst()
         .map(this::disk)
-        .toList();
+        .orElse(0d);
   }
 
   private double disk(OSFileStore osFileStore) {
@@ -127,39 +120,43 @@ public class SystemModule extends SamplingModule<SystemData> {
     String submodulesText =
         submodules.stream()
             .map(s -> s.format(avg))
-            .collect(Collectors.joining("<span fallback=\"false\"> </span>"));
+            .collect(joining("<span fallback=\"false\"> </span>"));
 
     return ModuleData.ofMarkup(submodulesText, MARKUP, name());
   }
 
-  private Optional<String> percentColors(double d) {
+  private String percentColors(double d) {
     if (d < .5d) {
-      return Optional.of("lime");
+      return "lime";
     } else if (d < .8d) {
-      return Optional.of("yellow");
+      return "yellow";
     } else {
-      return Optional.of("red");
+      return "red";
     }
   }
 
-  private Optional<String> swapColors(double d) {
+  private String swapColors(double d) {
     if (d < .1d) {
-      return Optional.of("lime");
+      return "lime";
     } else if (d < .4d) {
-      return Optional.of("yellow");
+      return "yellow";
     } else {
-      return Optional.of("red");
+      return "red";
     }
   }
 
   private SystemData reduceData(List<SystemData> samples) {
-    return SystemData.builder()
-        .cpu(average(samples, SystemData::cpu))
-        .memory(average(samples, SystemData::memory))
-        .swap(average(samples, SystemData::swap))
-        .netDown(difference(samples, SystemData::netDown))
-        .netUp(difference(samples, SystemData::netUp))
-        .build();
+    return new SystemData(
+        average(samples, SystemData::cpu),
+        average(samples, SystemData::memory),
+        average(samples, SystemData::swap),
+        last(samples, SystemData::disk),
+        difference(samples, SystemData::netDown),
+        difference(samples, SystemData::netUp));
+  }
+
+  private double last(List<SystemData> samples, ToDoubleFunction<SystemData> getter) {
+    return getter.applyAsDouble(samples.get(samples.size() - 1));
   }
 
   private double average(List<SystemData> samples, ToDoubleFunction<SystemData> getter) {

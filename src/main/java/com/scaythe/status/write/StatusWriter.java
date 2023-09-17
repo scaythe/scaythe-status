@@ -5,18 +5,16 @@ import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.lang.reflect.Type;
 import java.util.List;
-import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.flogger.Flogger;
 import org.springframework.stereotype.Component;
 
 @Component
+@Flogger
 public class StatusWriter {
-
-  private final Logger log = LoggerFactory.getLogger(getClass());
 
   private final Gson gson;
   private final Writer writer;
@@ -24,16 +22,22 @@ public class StatusWriter {
 
   public StatusWriter(Gson gson) throws IOException {
     this.gson = gson;
-    this.writer = new OutputStreamWriter(System.out);
+    writer = new OutputStreamWriter(System.out);
+    jsonWriter = gson.newJsonWriter(writer);
+  }
 
-    StatusHeader header = StatusHeader.builder().version(1).clickEvents(Optional.of(true)).build();
+  public void writeHeader() {
+    StatusHeader header = new StatusHeader(1, null, null, true);
 
     writeHeader(header, gson, writer);
 
-    this.jsonWriter = gson.newJsonWriter(this.writer);
-    this.jsonWriter.beginArray();
-    writer.append('\n');
-    jsonWriter.flush();
+    try {
+      jsonWriter.beginArray();
+      writer.append('\n');
+      jsonWriter.flush();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   private void writeHeader(StatusHeader header, Gson gson, Writer writer) {
@@ -42,8 +46,8 @@ public class StatusWriter {
       writer.append('\n');
       writer.flush();
     } catch (IOException e) {
-      log.error("problem writing header to std out : {} : {}", e.getClass(), e.getMessage());
-      log.error("", e);
+      log.atSevere().withCause(e).log(
+          "problem writing header to std out : %s : %s", e.getClass(), e.getMessage());
     }
   }
 
@@ -55,8 +59,8 @@ public class StatusWriter {
       writer.append('\n');
       jsonWriter.flush();
     } catch (IOException e) {
-      log.error("problem writing data to std out : {} : {}", e.getClass(), e.getMessage());
-      log.error("", e);
+      log.atSevere().withCause(e).log(
+          "problem writing data to std out : %s : %s", e.getClass(), e.getMessage());
     }
   }
 }

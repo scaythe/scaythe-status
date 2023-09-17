@@ -4,22 +4,17 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.TypeAdapterFactory;
 import java.util.ServiceLoader;
+import lombok.extern.flogger.Flogger;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
+@Flogger
 public class ScaytheStatusApp {
 
   public static void main(String[] args) {
-    try (ConfigurableApplicationContext ignored =
-        SpringApplication.run(ScaytheStatusApp.class, args)) {
-      try {
-        Thread.currentThread().join();
-      } catch (InterruptedException e) {
-      }
-    }
+    SpringApplication.run(ScaytheStatusApp.class, args);
   }
 
   @Bean
@@ -33,5 +28,15 @@ public class ScaytheStatusApp {
     //        gsonBuilder.setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
 
     return gsonBuilder.create();
+  }
+
+  public static Runnable logError(Runnable runnable) {
+    return () -> {
+      try {
+        runnable.run();
+      } catch (Exception e) {
+        log.atSevere().withCause(e).log();
+      }
+    };
   }
 }

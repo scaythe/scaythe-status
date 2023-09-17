@@ -1,5 +1,7 @@
 package com.scaythe.status.module;
 
+import static java.util.stream.Collectors.toMap;
+
 import com.scaythe.status.input.ClickEvent;
 import com.scaythe.status.module.config.ModuleConfig;
 import com.scaythe.status.write.ModuleData;
@@ -8,31 +10,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import org.freedesktop.dbus.DBusMap;
 import org.freedesktop.dbus.connections.impl.DBusConnection;
 import org.freedesktop.dbus.exceptions.DBusException;
 import org.freedesktop.dbus.interfaces.DBus;
 import org.freedesktop.dbus.interfaces.Properties;
 import org.freedesktop.dbus.types.Variant;
+import org.jspecify.annotations.Nullable;
 import org.mpris.MediaPlayer2.Player;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
-import reactor.core.scheduler.Schedulers;
 
 public class SpotifyModule extends Module {
-
   private static final String DBUS_BUS_NAME = "org.freedesktop.DBus";
   private static final String DBUS_PATH = "/org/freedesktop/DBus";
   private static final String SPOTIFY_BUS_NAME = "org.mpris.MediaPlayer2.spotify";
   private static final String SPOTIFY_PATH = "/org/mpris/MediaPlayer2";
 
-  private DBusConnection connection = null;
-  private Consumer<ModuleData> update = null;
-  private Player player = null;
+  private @Nullable SpotifyConnection connection;
 
-  public SpotifyModule(ModuleConfig config) {
-    super(config);
+  public SpotifyModule(ModuleConfig config, Consumer<ModuleData> output) {
+    super(config, output);
   }
 
   @Override
@@ -40,184 +36,196 @@ public class SpotifyModule extends Module {
     return "spotify";
   }
 
-  @Override
-  public Flux<ModuleData> data() {
-    if (connection != null) {
-      throw new RuntimeException();
-    }
+  private class SpotifyConnection {
+    private final DBusConnection connection;
+    private @Nullable Player player = null;
 
-    String address = System.getenv("DBUS_SESSION_BUS_ADDRESS");
+    private SpotifyConnection(DBusConnection connection) throws DBusException {
+      this.connection = connection;
 
-    try {
-      connection = DBusConnection.getConnection(address);
-    } catch (DBusException | NullPointerException e) {
-      return Flux.empty();
-    }
-
-    try {
       DBus dbus = connection.getRemoteObject(DBUS_BUS_NAME, DBUS_PATH, DBus.class);
 
       registerSpotifyStartStopListener();
 
-      return Flux.<ModuleData>create(s -> emitter(s, dbus))
-          .subscribeOn(Schedulers.parallel())
-          .doFinally(s -> stop());
-    } catch (DBusException e) {
-      e.printStackTrace();
-
-      stop();
+      startupStatus(dbus);
     }
 
-    return Flux.empty();
-  }
+    private void registerSpotifyStartStopListener() throws DBusException {
+      connection.addSigHandler(DBus.NameOwnerChanged.class, this::nameOwnerChanged);
+    }
 
-  private void emitter(FluxSink<ModuleData> sink, DBus dbus) {
-    update = sink::next;
+    private void startupStatus(DBus dbus) {
+      if (dbus.NameHasOwner(SPOTIFY_BUS_NAME)) {
+        String spotifyName = dbus.GetNameOwner(SPOTIFY_BUS_NAME);
 
-    startupStatus(dbus);
-  }
+        spotifyRunning(spotifyName);
+      }
+    }
 
-  private void startupStatus(DBus dbus) {
-    if (dbus.NameHasOwner(SPOTIFY_BUS_NAME)) {
-      String spotifyName = dbus.GetNameOwner(SPOTIFY_BUS_NAME);
+    private void nameOwnerChanged(DBus.NameOwnerChanged noc) {
+      String name = noc.name;
 
-      spotifyRunning(spotifyName);
+      if (!name.equals(SPOTIFY_BUS_NAME)) {
+        return;
+      }
+
+      String oldOwner = noc.oldOwner;
+      String newOwner = noc.newOwner;
+
+      try {
+        if (!newOwner.isEmpty() && oldOwner.isEmpty()) {
+          spotifyRunning(newOwner);
+        }
+
+        if (newOwner.isEmpty() && !oldOwner.isEmpty()) {
+          spotifyStopping(oldOwner);
+        }
+      } catch (DBusException e) {
+        e.printStackTrace();
+      }
+    }
+
+    private void spotifyStopping(String spotifyName) throws DBusException {
+      player = null;
+
+      connection.removeSigHandler(
+          Properties.PropertiesChanged.class, spotifyName, this::propertiesChanged);
+
+      ModuleData data = ModuleData.empty(name());
+
+      output(data);
+    }
+
+    private void spotifyRunning(String spotifyName) {
+      try {
+        connection.addSigHandler(
+            Properties.PropertiesChanged.class, spotifyName, this::propertiesChanged);
+        currentStatus();
+
+        player = connection.getPeerRemoteObject(SPOTIFY_BUS_NAME, SPOTIFY_PATH, Player.class);
+      } catch (DBusException e) {
+        e.printStackTrace();
+      }
+    }
+
+    private void currentStatus() {
+      try {
+        Properties props =
+            connection.getRemoteObject(SPOTIFY_BUS_NAME, SPOTIFY_PATH, Properties.class);
+
+        update(props.GetAll(Player.class.getName()));
+      } catch (DBusException e) {
+        e.printStackTrace();
+      }
+    }
+
+    private void propertiesChanged(Properties.PropertiesChanged p) {
+      update(p.getPropertiesChanged());
+    }
+
+    private void update(Map<String, Variant<?>> map) {
+      Map<String, String> metadata = metadata(map);
+
+      String song = metadata.get("xesam:title");
+      String artist = metadata.get("xesam:artist");
+
+      String text = song + " - " + artist;
+
+      ModuleData data =
+          playbackStatus(map)
+              .flatMap(this::color)
+              .map(c -> ModuleData.ofColor(text, c, name()))
+              .orElseGet(() -> ModuleData.of(text, name()));
+
+      output(data);
+    }
+
+    private Optional<String> color(String status) {
+      switch (status) {
+        case "Playing":
+          return Optional.of("#00ff00");
+        case "Paused":
+          return Optional.of("#ffff00");
+        default:
+          return Optional.of("#ff0000");
+      }
+    }
+
+    private Map<String, String> metadata(Map<String, Variant<?>> map) {
+      return Optional.ofNullable(map.get("Metadata"))
+          .filter(
+              v -> v.getType().getTypeName().startsWith("org.freedesktop.dbus.types.DBusMapType"))
+          .map(Variant::getValue)
+          .map(DBusMap.class::cast)
+          .map(this::asMap)
+          .orElse(Collections.emptyMap());
+    }
+
+    private Map<String, String> asMap(DBusMap<String, Variant<?>> map) {
+      return map.entrySet().stream().collect(toMap(Map.Entry::getKey, e -> variant(e.getValue())));
+    }
+
+    private Optional<String> playbackStatus(Map<String, Variant<?>> map) {
+      return Optional.ofNullable(map.get("PlaybackStatus")).map(this::variant);
+    }
+
+    private String variant(Variant<?> v) {
+      if (v.getSig().equals("as")) {
+        return variantStringList((Variant<List<String>>) v);
+      }
+
+      return v.getValue().toString();
+    }
+
+    private String variantStringList(Variant<List<String>> v) {
+      return String.join(", ", v.getValue());
+    }
+
+    public void disconnect() {
+      connection.disconnect();
+    }
+
+    public void event() {
+      if (player != null) {
+        player.PlayPause();
+      }
     }
   }
 
   @Override
   public void event(ClickEvent event) {
-    if (player != null) {
-      player.PlayPause();
-    }
+    if (connection == null) return;
+
+    connection.event();
   }
 
-  private void registerSpotifyStartStopListener() throws DBusException {
-    connection.addSigHandler(DBus.NameOwnerChanged.class, this::nameOwnerChanged);
-  }
+  @Override
+  public synchronized void start() {
+    if (connection != null) throw new IllegalStateException("already running");
 
-  private void nameOwnerChanged(DBus.NameOwnerChanged noc) {
-    String name = noc.name;
-
-    if (!name.equals(SPOTIFY_BUS_NAME)) {
-      return;
-    }
-
-    String oldOwner = noc.oldOwner;
-    String newOwner = noc.newOwner;
+    String address = System.getenv("DBUS_SESSION_BUS_ADDRESS");
 
     try {
-      if (!newOwner.isEmpty() && oldOwner.isEmpty()) {
-        spotifyRunning(newOwner);
-      }
-
-      if (newOwner.isEmpty() && !oldOwner.isEmpty()) {
-        spotifyStopping(oldOwner);
-      }
+      DBusConnection dBusConnection = DBusConnection.getConnection(address);
+      this.connection = new SpotifyConnection(dBusConnection);
     } catch (DBusException e) {
-      e.printStackTrace();
+      stop();
+
+      throw new IllegalStateException("dbus connection failed", e);
     }
   }
 
-  private void spotifyStopping(String spotifyName) throws DBusException {
-    player = null;
+  @Override
+  public synchronized void pause() {
+    if (connection == null) throw new IllegalStateException("not running");
 
-    connection.removeSigHandler(
-        Properties.PropertiesChanged.class, spotifyName, this::propertiesChanged);
-
-    ModuleData data = ModuleData.empty(name());
-
-    update.accept(data);
+    stop();
   }
 
-  private void spotifyRunning(String spotifyName) {
-    try {
-      connection.addSigHandler(
-          Properties.PropertiesChanged.class, spotifyName, this::propertiesChanged);
-      currentStatus();
+  @Override
+  public synchronized void stop() {
+    if (connection == null) return;
 
-      player = connection.getPeerRemoteObject(SPOTIFY_BUS_NAME, SPOTIFY_PATH, Player.class);
-    } catch (DBusException e) {
-      e.printStackTrace();
-    }
-  }
-
-  private void currentStatus() {
-    try {
-      Properties props =
-          connection.getRemoteObject(SPOTIFY_BUS_NAME, SPOTIFY_PATH, Properties.class);
-
-      update(props.GetAll(Player.class.getName()));
-    } catch (DBusException e) {
-      e.printStackTrace();
-    }
-  }
-
-  private void propertiesChanged(Properties.PropertiesChanged p) {
-    update(p.getPropertiesChanged());
-  }
-
-  private void update(Map<String, Variant<?>> map) {
-    Map<String, String> metadata = metadata(map);
-
-    String song = metadata.get("xesam:title");
-    String artist = metadata.get("xesam:artist");
-
-    String text = song + " - " + artist;
-
-    ModuleData data =
-        playbackStatus(map)
-            .flatMap(this::color)
-            .map(c -> ModuleData.ofColor(text, c, name()))
-            .orElseGet(() -> ModuleData.of(text, name()));
-
-    update.accept(data);
-  }
-
-  private Optional<String> color(String status) {
-    switch (status) {
-      case "Playing":
-        return Optional.of("#00ff00");
-      case "Paused":
-        return Optional.of("#ffff00");
-      default:
-        return Optional.of("#ff0000");
-    }
-  }
-
-  private Map<String, String> metadata(Map<String, Variant<?>> map) {
-    return Optional.ofNullable(map.get("Metadata"))
-        .filter(v -> v.getType().getTypeName().startsWith("org.freedesktop.dbus.types.DBusMapType"))
-        .map(Variant::getValue)
-        .map(DBusMap.class::cast)
-        .map(this::toMap)
-        .orElse(Collections.emptyMap());
-  }
-
-  private Map<String, String> toMap(DBusMap<String, Variant<?>> map) {
-    return map.entrySet().stream()
-        .collect(Collectors.toMap(Map.Entry::getKey, e -> variant(e.getValue())));
-  }
-
-  private Optional<String> playbackStatus(Map<String, Variant<?>> map) {
-    return Optional.ofNullable(map.get("PlaybackStatus")).map(this::variant);
-  }
-
-  private String variant(Variant<?> v) {
-    if (v.getSig().equals("as")) {
-      return variantStringList((Variant<List<String>>) v);
-    }
-
-    return v.getValue().toString();
-  }
-
-  private String variantStringList(Variant<List<String>> v) {
-    return String.join(", ", v.getValue());
-  }
-
-  public void stop() {
-    if (connection != null) {
-      connection.disconnect();
-    }
+    connection.disconnect();
   }
 }

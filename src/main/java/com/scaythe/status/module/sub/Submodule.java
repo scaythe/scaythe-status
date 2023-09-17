@@ -1,8 +1,8 @@
 package com.scaythe.status.module.sub;
 
 import java.text.MessageFormat;
-import java.util.Optional;
 import java.util.function.Function;
+import org.jspecify.annotations.Nullable;
 
 public class Submodule<D, T> {
 
@@ -16,13 +16,13 @@ public class Submodule<D, T> {
   private final String icon;
   private final Function<D, T> extractor;
   private final Function<T, String> formatter;
-  private final Function<T, Optional<String>> foreground;
+  private final Function<T, @Nullable String> foreground;
 
   public Submodule(
       String icon,
       Function<D, T> extractor,
       Function<T, String> formatter,
-      Function<T, Optional<String>> foreground) {
+      Function<T, @Nullable String> foreground) {
     this.icon = icon;
     this.extractor = extractor;
     this.formatter = formatter;
@@ -33,11 +33,13 @@ public class Submodule<D, T> {
     T data = extractor.apply(parentData);
 
     String dataText = formatter.apply(data);
-    Optional<String> color = foreground.apply(data);
+    String color = foreground.apply(data);
 
     String submoduleText = formatSubmodule(dataText);
 
-    return color.map(c -> formatWithColor(submoduleText, c)).orElse(submoduleText);
+    if (color == null) return submoduleText;
+
+    return formatWithColor(submoduleText, color);
   }
 
   private String formatSubmodule(String data) {

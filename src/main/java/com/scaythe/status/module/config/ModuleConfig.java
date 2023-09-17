@@ -1,10 +1,10 @@
 package com.scaythe.status.module.config;
 
-import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
-public record ModuleConfig(Optional<String> name, Optional<String> instance) {
+public record ModuleConfig(@Nullable String name, @Nullable String instance) {
 
   public static ModuleConfig defaults() {
-    return new ModuleConfig(Optional.empty(), Optional.empty());
+    return new ModuleConfig(null, null);
   }
 }

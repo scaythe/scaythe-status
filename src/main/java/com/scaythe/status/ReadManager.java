@@ -1,47 +1,53 @@
 package com.scaythe.status;
 
+import static com.scaythe.status.ScaytheStatusApp.logError;
+
 import com.scaythe.status.input.ClickEvent;
 import com.scaythe.status.input.EventReader;
-import java.util.Objects;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.flogger.Flogger;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
-import reactor.core.Disposable;
 
 @Component
+@RequiredArgsConstructor
+@Flogger
 public class ReadManager implements SmartLifecycle {
-
   private final ModuleManager moduleManager;
   private final EventReader reader;
 
-  private Disposable disposable = null;
+  private final ExecutorService executor = Executors.newCachedThreadPool();
+  private final BlockingQueue<ClickEvent> queue = new SynchronousQueue<>();
+  private boolean started = false;
 
-  public ReadManager(ModuleManager moduleManager, EventReader reader) {
-    this.moduleManager = moduleManager;
-    this.reader = reader;
-  }
-
-  @Override
-  public void start() {
-    disposable = reader.events().doOnNext(this::event).subscribe();
-  }
-
-  @Override
-  public void stop() {
-    if (disposable != null) {
-      disposable.dispose();
-      disposable = null;
+  private void dispatchEvents() {
+    while (!Thread.interrupted()) {
+      try {
+        moduleManager.dispatchEvent(queue.take());
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
     }
   }
 
   @Override
-  public boolean isRunning() {
-    return disposable != null;
+  public synchronized void start() {
+    executor.submit(logError(() -> reader.read(queue::add)));
+    executor.submit(logError(this::dispatchEvents));
+    started = true;
   }
 
-  private void event(ClickEvent event) {
-    moduleManager.modules().stream()
-        .filter(m -> m.name().equals(event.name().orElse(null)))
-        .filter(m -> Objects.equals(m.instance(), event.instance()))
-        .forEach(m -> m.event(event));
+  @Override
+  public synchronized void stop() {
+    executor.shutdownNow();
+  }
+
+  @Override
+  public synchronized boolean isRunning() {
+    return started && !executor.isTerminated();
   }
 }
