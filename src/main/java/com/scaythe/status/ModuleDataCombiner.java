@@ -36,7 +36,11 @@ public class ModuleDataCombiner {
                 newOutput.set(index, moduleData);
                 return List.copyOf(newOutput);
               });
-      combinedDataQueue.add(combinedData);
+      try {
+        combinedDataQueue.put(combinedData);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
     };
   }
 }

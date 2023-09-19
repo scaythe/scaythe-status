@@ -9,13 +9,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.SynchronousQueue;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.flogger.Flogger;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-@Flogger
+@Slf4j
 public class ReadManager implements SmartLifecycle {
   private final ModuleManager moduleManager;
   private final EventReader reader;

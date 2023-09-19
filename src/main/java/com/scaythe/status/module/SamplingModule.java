@@ -9,23 +9,27 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import org.jspecify.annotations.Nullable;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 abstract class SamplingModule<T> extends Module {
   private final Duration sampleRate;
   private final List<T> samples;
 
   private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
-  private @Nullable ScheduledFuture<?> execution = null;
+  private boolean started = false;
 
   SamplingModule(SamplingModuleConfig config, Consumer<ModuleData> output) {
     super(config.moduleConfig(), output);
 
     sampleRate = Objects.requireNonNullElseGet(config.sampleRate(), this::defaultSampleRate);
     samples = new LimitedQueue<>(Objects.requireNonNullElseGet(config.size(), this::defaultSize));
+  }
+
+  private void submitNextOutput() {
+    executor.submit(this::produceOutput);
   }
 
   private void produceOutput() {
@@ -37,20 +41,11 @@ abstract class SamplingModule<T> extends Module {
   @Override
   public void start() {
     if (executor.isShutdown()) throw new IllegalStateException("already stopped");
-    if (execution != null) throw new IllegalStateException("already running");
+    if (started) throw new IllegalStateException("already started");
 
-    execution =
-        executor.scheduleAtFixedRate(
-            logError(this::produceOutput), 0, sampleRate.toMillis(), TimeUnit.MILLISECONDS);
-  }
-
-  @Override
-  public void pause() {
-    if (executor.isShutdown()) throw new IllegalStateException("already stopped");
-    if (execution == null) throw new IllegalStateException("not running");
-
-    execution.cancel(true);
-    execution = null;
+    executor.scheduleWithFixedDelay(
+        logError(this::submitNextOutput), 0, sampleRate.toMillis(), TimeUnit.MILLISECONDS);
+    started = true;
   }
 
   @Override

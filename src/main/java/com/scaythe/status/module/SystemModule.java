@@ -14,10 +14,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.ToDoubleFunction;
 import java.util.function.ToLongFunction;
+import lombok.extern.slf4j.Slf4j;
 import oshi.SystemInfo;
 import oshi.hardware.NetworkIF;
 import oshi.software.os.OSFileStore;
 
+@Slf4j
 public class SystemModule extends SamplingModule<SystemData> {
 
   private static final String MARKUP = PangoMarkup.NAME;
@@ -32,11 +34,10 @@ public class SystemModule extends SamplingModule<SystemData> {
 
     submodules =
         List.of(
-            new Submodule<>("\uF2DB", SystemData::cpu, FormatPercent::format, this::percentColors),
-            new Submodule<>(
-                "\uF0C9", SystemData::memory, FormatPercent::format, this::percentColors),
+            new Submodule<>("\uF2DB", SystemData::cpu, FormatPercent::format, this::cpuColors),
+            new Submodule<>("\uF0C9", SystemData::memory, FormatPercent::format, this::ramColors),
             new Submodule<>("\uF0EC", SystemData::swap, FormatPercent::format, this::swapColors),
-            new Submodule<>("\uF2DB", SystemData::disk, FormatPercent::format, this::percentColors),
+            new Submodule<>("\uF0A0", SystemData::disk, FormatPercent::format, this::diskColors),
             new Submodule<>("\uF019", SystemData::netDown, FormatBytes::format, d -> null),
             new Submodule<>("\uF093", SystemData::netUp, FormatBytes::format, d -> null));
   }
@@ -58,6 +59,8 @@ public class SystemModule extends SamplingModule<SystemData> {
 
   @Override
   public SystemData sample() {
+    log.atDebug().log("sampling");
+
     return new SystemData(cpu(), memory(), swap(), disk(), netDown(), netUp());
   }
 
@@ -125,24 +128,26 @@ public class SystemModule extends SamplingModule<SystemData> {
     return ModuleData.ofMarkup(submodulesText, MARKUP, name());
   }
 
-  private String percentColors(double d) {
-    if (d < .5d) {
-      return "lime";
-    } else if (d < .8d) {
-      return "yellow";
-    } else {
-      return "red";
-    }
+  private String cpuColors(double d) {
+    return colors(d, .5d, .8d);
+  }
+
+  private String ramColors(double d) {
+    return colors(d, .5d, .8d);
+  }
+
+  private String diskColors(double d) {
+    return colors(d, .8d, .95d);
   }
 
   private String swapColors(double d) {
-    if (d < .1d) {
-      return "lime";
-    } else if (d < .4d) {
-      return "yellow";
-    } else {
-      return "red";
-    }
+    return colors(d, .2d, .5d);
+  }
+
+  private String colors(double d, double warnThreshold, double errorThreshold) {
+    if (d > errorThreshold) return "red";
+    if (d > warnThreshold) return "yellow";
+    return "lime";
   }
 
   private SystemData reduceData(List<SystemData> samples) {

@@ -3,6 +3,7 @@ package com.scaythe.status;
 import com.scaythe.status.input.ClickEvent;
 import com.scaythe.status.module.ClockModule;
 import com.scaythe.status.module.Module;
+import com.scaythe.status.module.SpotifyModule;
 import com.scaythe.status.module.SystemModule;
 import com.scaythe.status.module.config.SamplingModuleConfig;
 import com.scaythe.status.write.ModuleData;
@@ -29,7 +30,7 @@ public class ModuleManager implements SmartLifecycle {
     ModuleDataCombiner combiner = new ModuleDataCombiner(combinedDataQueue);
     modules =
         List.of(
-            //            new SpotifyModule(config.moduleConfig(), combiner.getNextModuleOutput()),
+            new SpotifyModule(config.moduleConfig(), combiner.getNextModuleOutput()),
             new SystemModule(config, combiner.getNextModuleOutput()),
             new ClockModule(config.moduleConfig(), combiner.getNextModuleOutput()));
   }

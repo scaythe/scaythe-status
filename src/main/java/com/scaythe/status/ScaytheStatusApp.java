@@ -4,13 +4,13 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.TypeAdapterFactory;
 import java.util.ServiceLoader;
-import lombok.extern.flogger.Flogger;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
-@Flogger
+@Slf4j
 public class ScaytheStatusApp {
 
   public static void main(String[] args) {
@@ -35,7 +35,7 @@ public class ScaytheStatusApp {
       try {
         runnable.run();
       } catch (Exception e) {
-        log.atSevere().withCause(e).log();
+        log.atError().setCause(e).log();
       }
     };
   }

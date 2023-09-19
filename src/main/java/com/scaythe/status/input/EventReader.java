@@ -8,13 +8,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.flogger.Flogger;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-@Flogger
+@Slf4j
 public class EventReader {
   private final Gson json;
 
@@ -27,8 +27,9 @@ public class EventReader {
         if (clickEvent != null) consumer.accept(clickEvent);
       }
     } catch (IOException e) {
-      log.atSevere().withCause(e).log(
-          "problem reading json input : %s : %s", e.getClass().getName(), e.getMessage());
+      log.atError()
+          .setCause(e)
+          .log("problem reading json input : {} : {}", e.getClass().getName(), e.getMessage());
     }
   }
 
@@ -36,11 +37,13 @@ public class EventReader {
     try {
       return json.fromJson(reader, ClickEvent.class);
     } catch (JsonIOException e) {
-      log.atSevere().withCause(e).log(
-          "problem reading json input : %s : %s", e.getClass().getName(), e.getMessage());
+      log.atError()
+          .setCause(e)
+          .log("problem reading json input : {} : {}", e.getClass().getName(), e.getMessage());
     } catch (JsonSyntaxException e) {
-      log.atSevere().withCause(e).log(
-          "malformed json input : %s : %s", e.getClass().getName(), e.getMessage());
+      log.atError()
+          .setCause(e)
+          .log("malformed json input : {} : {}", e.getClass().getName(), e.getMessage());
     }
 
     return null;

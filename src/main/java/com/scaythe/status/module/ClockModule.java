@@ -11,18 +11,18 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import org.jspecify.annotations.Nullable;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class ClockModule extends Module {
 
   private static final DateTimeFormatter formatter =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
   private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
-  private @Nullable ScheduledFuture<?> nextExecution = null;
+  private boolean started = false;
 
   public ClockModule(ModuleConfig config, Consumer<ModuleData> output) {
     super(config, output);
@@ -39,40 +39,34 @@ public class ClockModule extends Module {
   }
 
   private void produceOutput() {
-    output(ModuleData.of(format(Instant.now()), name()));
+    log.atDebug().log("producing output");
+    // add a little time to avoid sometimes generating output for the previous second
+    output(ModuleData.of(format(Instant.now().plusMillis(100)), name()));
   }
 
   private Duration getDelayToNextSecond() {
     Instant now = Instant.now();
-    Instant nextSecond = now.plusSeconds(1).truncatedTo(ChronoUnit.SECONDS);
+    // a bit more than one second to avoid sometimes generating two outputs in the same second
+    Instant nextSecond = now.plusMillis(1100).truncatedTo(ChronoUnit.SECONDS);
     return Duration.between(now, nextSecond);
   }
 
   private synchronized void scheduleNextExecution(Duration delay) {
     if (Thread.interrupted()) return;
 
-    nextExecution =
-        executor.schedule(
-            logError(this::produceOutputAndScheduleNextExecution),
-            delay.toMillis(),
-            TimeUnit.MILLISECONDS);
+    executor.schedule(
+        logError(this::produceOutputAndScheduleNextExecution),
+        delay.toMillis(),
+        TimeUnit.MILLISECONDS);
   }
 
   @Override
   public synchronized void start() {
     if (executor.isShutdown()) throw new IllegalStateException("already stopped");
-    if (nextExecution != null) throw new IllegalStateException("already running");
+    if (started) throw new IllegalStateException("already started");
 
     scheduleNextExecution(Duration.ZERO);
-  }
-
-  @Override
-  public synchronized void pause() {
-    if (executor.isShutdown()) throw new IllegalStateException("already stopped");
-    if (nextExecution == null) throw new IllegalStateException("not running");
-
-    nextExecution.cancel(true);
-    nextExecution = null;
+    started = true;
   }
 
   @Override

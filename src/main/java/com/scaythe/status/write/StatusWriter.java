@@ -9,11 +9,11 @@ import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.lang.reflect.Type;
 import java.util.List;
-import lombok.extern.flogger.Flogger;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 @Component
-@Flogger
+@Slf4j
 public class StatusWriter {
 
   private final Gson gson;
@@ -46,8 +46,8 @@ public class StatusWriter {
       writer.append('\n');
       writer.flush();
     } catch (IOException e) {
-      log.atSevere().withCause(e).log(
-          "problem writing header to std out : %s : %s", e.getClass(), e.getMessage());
+      log.atError().setCause(e).log(
+          "problem writing header to std out : {} : {}", e.getClass(), e.getMessage());
     }
   }
 
@@ -59,8 +59,8 @@ public class StatusWriter {
       writer.append('\n');
       jsonWriter.flush();
     } catch (IOException e) {
-      log.atSevere().withCause(e).log(
-          "problem writing data to std out : %s : %s", e.getClass(), e.getMessage());
+      log.atError().setCause(e).log(
+          "problem writing data to std out : {} : {}", e.getClass(), e.getMessage());
     }
   }
 }

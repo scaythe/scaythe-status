@@ -141,14 +141,11 @@ public class SpotifyModule extends Module {
     }
 
     private Optional<String> color(String status) {
-      switch (status) {
-        case "Playing":
-          return Optional.of("#00ff00");
-        case "Paused":
-          return Optional.of("#ffff00");
-        default:
-          return Optional.of("#ff0000");
-      }
+      return switch (status) {
+        case "Playing" -> Optional.of("#00ff00");
+        case "Paused" -> Optional.of("#ffff00");
+        default -> Optional.of("#ff0000");
+      };
     }
 
     private Map<String, String> metadata(Map<String, Variant<?>> map) {
@@ -213,13 +210,6 @@ public class SpotifyModule extends Module {
 
       throw new IllegalStateException("dbus connection failed", e);
     }
-  }
-
-  @Override
-  public synchronized void pause() {
-    if (connection == null) throw new IllegalStateException("not running");
-
-    stop();
   }
 
   @Override
