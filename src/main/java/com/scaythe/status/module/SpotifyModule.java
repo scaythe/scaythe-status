@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+import lombok.extern.slf4j.Slf4j;
 import org.freedesktop.dbus.DBusMap;
 import org.freedesktop.dbus.connections.impl.DBusConnection;
 import org.freedesktop.dbus.exceptions.DBusException;
@@ -19,6 +20,7 @@ import org.freedesktop.dbus.types.Variant;
 import org.jspecify.annotations.Nullable;
 import org.mpris.MediaPlayer2.Player;
 
+@Slf4j
 public class SpotifyModule extends Module {
   private static final String DBUS_BUS_NAME = "org.freedesktop.DBus";
   private static final String DBUS_PATH = "/org/freedesktop/DBus";
@@ -81,7 +83,7 @@ public class SpotifyModule extends Module {
           spotifyStopping(oldOwner);
         }
       } catch (DBusException e) {
-        e.printStackTrace();
+        log.atError().setCause(e).log("error handling name owner changed");
       }
     }
 
@@ -104,7 +106,7 @@ public class SpotifyModule extends Module {
 
         player = connection.getPeerRemoteObject(SPOTIFY_BUS_NAME, SPOTIFY_PATH, Player.class);
       } catch (DBusException e) {
-        e.printStackTrace();
+        log.atError().setCause(e).log("error handling spotify running");
       }
     }
 
@@ -115,7 +117,7 @@ public class SpotifyModule extends Module {
 
         update(props.GetAll(Player.class.getName()));
       } catch (DBusException e) {
-        e.printStackTrace();
+        log.atError().setCause(e).log("error getting current status");
       }
     }
 

@@ -20,7 +20,7 @@ public class ReadManager implements SmartLifecycle {
   private final ModuleManager moduleManager;
   private final EventReader reader;
 
-  private final ExecutorService executor = Executors.newCachedThreadPool();
+  private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
   private final BlockingQueue<ClickEvent> queue = new SynchronousQueue<>();
   private boolean started = false;
 

@@ -7,6 +7,7 @@ import com.scaythe.status.write.ModuleData;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -16,7 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 abstract class SamplingModule<T> extends Module {
   private final Duration sampleRate;
-  private final List<T> samples;
+  private final Queue<T> samples;
 
   private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
   private boolean started = false;

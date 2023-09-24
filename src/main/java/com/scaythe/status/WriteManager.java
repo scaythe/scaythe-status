@@ -18,7 +18,7 @@ public class WriteManager implements SmartLifecycle {
   private final StatusWriter writer;
   private final BlockingQueue<List<ModuleData>> combinedDataQueue;
 
-  private final ExecutorService executor = Executors.newSingleThreadExecutor();
+  private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
   private boolean started = false;
 
   public WriteManager(ModuleManager moduleManager, StatusWriter writer) {

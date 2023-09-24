@@ -8,6 +8,7 @@ import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -15,14 +16,13 @@ import org.springframework.stereotype.Component;
 @Component
 @Slf4j
 public class StatusWriter {
-
   private final Gson gson;
   private final Writer writer;
   private final JsonWriter jsonWriter;
 
   public StatusWriter(Gson gson) throws IOException {
     this.gson = gson;
-    writer = new OutputStreamWriter(System.out);
+    writer = new OutputStreamWriter(System.out, StandardCharsets.UTF_8);
     jsonWriter = gson.newJsonWriter(writer);
   }
 
@@ -46,8 +46,9 @@ public class StatusWriter {
       writer.append('\n');
       writer.flush();
     } catch (IOException e) {
-      log.atError().setCause(e).log(
-          "problem writing header to std out : {} : {}", e.getClass(), e.getMessage());
+      log.atError()
+          .setCause(e)
+          .log("problem writing header to std out : {} : {}", e.getClass(), e.getMessage());
     }
   }
 
@@ -59,8 +60,9 @@ public class StatusWriter {
       writer.append('\n');
       jsonWriter.flush();
     } catch (IOException e) {
-      log.atError().setCause(e).log(
-          "problem writing data to std out : {} : {}", e.getClass(), e.getMessage());
+      log.atError()
+          .setCause(e)
+          .log("problem writing data to std out : {} : {}", e.getClass(), e.getMessage());
     }
   }
 }

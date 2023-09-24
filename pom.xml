@@ -82,8 +82,7 @@
         <configuration>
           <compilerArgs>
             <arg>-XDcompilePolicy=simple</arg>
-            <arg>-Xplugin:ErrorProne -Xep:NullAway:ERROR -XepDisableWarningsInGeneratedCode -XepOpt:NullAway:AnnotatedPackages=com.scaythe
-            </arg>
+            <arg>-Xplugin:ErrorProne -Xep:NullAway:ERROR -XepDisableWarningsInGeneratedCode -XepOpt:NullAway:AnnotatedPackages=com.scaythe</arg>
           </compilerArgs>
           <annotationProcessorPaths>
             <path>

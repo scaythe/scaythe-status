@@ -1,14 +1,12 @@
 package com.scaythe.status.module;
 
-import java.util.LinkedList;
+import java.util.ArrayDeque;
+import lombok.RequiredArgsConstructor;
 
-public class LimitedQueue<E> extends LinkedList<E> {
+@RequiredArgsConstructor
+public class LimitedQueue<E> extends ArrayDeque<E> {
 
   private final int limit;
-
-  public LimitedQueue(int limit) {
-    this.limit = limit;
-  }
 
   @Override
   public boolean add(E o) {
