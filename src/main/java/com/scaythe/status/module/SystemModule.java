@@ -9,9 +9,12 @@ import com.scaythe.status.module.config.SamplingModuleConfig;
 import com.scaythe.status.module.sub.Submodule;
 import com.scaythe.status.write.ModuleData;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
+import java.util.SequencedCollection;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.ToDoubleFunction;
 import java.util.function.ToLongFunction;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +41,7 @@ public class SystemModule extends SamplingModule<SystemData> {
             new Submodule<>("\uF0C9", SystemData::memory, FormatPercent::format, this::ramColors),
             new Submodule<>("\uF0EC", SystemData::swap, FormatPercent::format, this::swapColors),
             new Submodule<>("\uF0A0", SystemData::disk, FormatPercent::format, this::diskColors),
+            new Submodule<>("\uE4E2", SystemData::netInterface, Function.identity(), d -> null),
             new Submodule<>("\uF019", SystemData::netDown, FormatBytes::format, d -> null),
             new Submodule<>("\uF093", SystemData::netUp, FormatBytes::format, d -> null));
   }
@@ -61,7 +65,10 @@ public class SystemModule extends SamplingModule<SystemData> {
   public SystemData sample() {
     log.atDebug().log("sampling");
 
-    return new SystemData(cpu(), memory(), swap(), disk(), netDown(), netUp());
+    NetData netData = netData();
+
+    return new SystemData(
+        cpu(), memory(), swap(), disk(), netData.label(), netData.down(), netData.up());
   }
 
   private double cpu() {
@@ -104,20 +111,24 @@ public class SystemModule extends SamplingModule<SystemData> {
     return (double) used / (double) total;
   }
 
-  private long netDown() {
+  private record NetData(String label, long down, long up) {}
+
+  private NetData netData() {
     return systemInfo.getHardware().getNetworkIFs().stream()
-        .mapToLong(NetworkIF::getBytesRecv)
-        .sum();
+        .filter(n -> n.getName().equals("eno1"))
+        .map(SystemModule::getNetData)
+        .findFirst()
+        .orElse(new NetData("", 0, 0));
   }
 
-  private long netUp() {
-    return systemInfo.getHardware().getNetworkIFs().stream()
-        .mapToLong(NetworkIF::getBytesSent)
-        .sum();
+  private static NetData getNetData(NetworkIF n) {
+    String ip = Arrays.stream(n.getIPv4addr()).findFirst().orElse("");
+    String label = "%s:%s".formatted(n.getName(), ip);
+    return new NetData(label, n.getBytesRecv(), n.getBytesSent());
   }
 
   @Override
-  public ModuleData reduce(List<SystemData> samples) {
+  public ModuleData reduce(SequencedCollection<SystemData> samples) {
     SystemData avg = reduceData(samples);
 
     String submodulesText =
@@ -150,25 +161,28 @@ public class SystemModule extends SamplingModule<SystemData> {
     return "lime";
   }
 
-  private SystemData reduceData(List<SystemData> samples) {
+  private SystemData reduceData(SequencedCollection<SystemData> samples) {
     return new SystemData(
         average(samples, SystemData::cpu),
         average(samples, SystemData::memory),
         average(samples, SystemData::swap),
         last(samples, SystemData::disk),
+        last(samples, SystemData::netInterface),
         difference(samples, SystemData::netDown),
         difference(samples, SystemData::netUp));
   }
 
-  private double last(List<SystemData> samples, ToDoubleFunction<SystemData> getter) {
-    return getter.applyAsDouble(samples.get(samples.size() - 1));
+  private <T> T last(SequencedCollection<SystemData> samples, Function<SystemData, T> getter) {
+    return getter.apply(samples.getLast());
   }
 
-  private double average(List<SystemData> samples, ToDoubleFunction<SystemData> getter) {
+  private double average(
+      SequencedCollection<SystemData> samples, ToDoubleFunction<SystemData> getter) {
     return samples.stream().mapToDouble(getter).average().orElse(0);
   }
 
-  private long difference(List<SystemData> samples, ToLongFunction<SystemData> getter) {
-    return getter.applyAsLong(samples.get(samples.size() - 1)) - getter.applyAsLong(samples.get(0));
+  private long difference(
+      SequencedCollection<SystemData> samples, ToLongFunction<SystemData> getter) {
+    return getter.applyAsLong(samples.getLast()) - getter.applyAsLong(samples.getFirst());
   }
 }

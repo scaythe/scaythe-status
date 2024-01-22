@@ -25,15 +25,8 @@
     <dbus-java.version>3.3.2</dbus-java.version>
     <oshi-core.version>6.4.0</oshi-core.version>
     <gson.version>2.10.1</gson.version>
-    <lombok.version>edge-SNAPSHOT</lombok.version>
+    <lombok.version>1.18.30</lombok.version>
   </properties>
-
-  <repositories>
-    <repository>
-      <id>projectlombok.org</id>
-      <url>https://projectlombok.org/edge-releases</url>
-    </repository>
-  </repositories>
 
   <dependencies>
     <dependency>
