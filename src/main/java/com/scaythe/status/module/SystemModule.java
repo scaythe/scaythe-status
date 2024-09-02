@@ -41,7 +41,6 @@ public class SystemModule extends SamplingModule<SystemData> {
             new Submodule<>("\uF538", SystemData::memory, FormatPercent::format, this::ramColors),
             new Submodule<>("\uF074", SystemData::swap, FormatPercent::format, this::swapColors),
             new Submodule<>("\uF0A0", SystemData::disk, FormatPercent::format, this::diskColors),
-            new Submodule<>("\uE4E2", SystemData::netInterface, Function.identity(), d -> null),
             new Submodule<>("\uF019", SystemData::netDown, FormatBytes::format, d -> null),
             new Submodule<>("\uF093", SystemData::netUp, FormatBytes::format, d -> null));
   }
