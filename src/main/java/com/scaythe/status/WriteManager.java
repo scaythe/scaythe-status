@@ -39,7 +39,7 @@ public class WriteManager implements SmartLifecycle {
           writer.write(data);
           lastData = data;
         }
-      } catch (InterruptedException e) {
+      } catch (InterruptedException _) {
         Thread.currentThread().interrupt();
       }
     }

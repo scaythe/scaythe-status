@@ -28,7 +28,7 @@ public class ReadManager implements SmartLifecycle {
     while (!Thread.interrupted()) {
       try {
         moduleManager.dispatchEvent(queue.take());
-      } catch (InterruptedException e) {
+      } catch (InterruptedException _) {
         Thread.currentThread().interrupt();
       }
     }

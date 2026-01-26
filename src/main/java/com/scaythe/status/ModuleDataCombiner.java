@@ -38,7 +38,7 @@ public class ModuleDataCombiner {
               });
       try {
         combinedDataQueue.put(combinedData);
-      } catch (InterruptedException e) {
+      } catch (InterruptedException _) {
         Thread.currentThread().interrupt();
       }
     };

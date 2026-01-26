@@ -1,5 +1,6 @@
 package com.scaythe.status.module;
 
+import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.joining;
 
 import com.scaythe.status.format.FormatBytes;
@@ -41,8 +42,8 @@ public class SystemModule extends SamplingModule<SystemData> {
             new Submodule<>("\uF538", SystemData::memory, FormatPercent::format, this::ramColors),
             new Submodule<>("\uF074", SystemData::swap, FormatPercent::format, this::swapColors),
             new Submodule<>("\uF0A0", SystemData::disk, FormatPercent::format, this::diskColors),
-            new Submodule<>("\uF019", SystemData::netDown, FormatBytes::format, d -> null),
-            new Submodule<>("\uF093", SystemData::netUp, FormatBytes::format, d -> null));
+            new Submodule<>("\uF019", SystemData::netDown, FormatBytes::format, _ -> null),
+            new Submodule<>("\uF093", SystemData::netUp, FormatBytes::format, _ -> null));
   }
 
   @Override
@@ -114,9 +115,8 @@ public class SystemModule extends SamplingModule<SystemData> {
 
   private NetData netData() {
     return systemInfo.getHardware().getNetworkIFs().stream()
-        .filter(n -> n.getName().equals("eno1"))
+        .min(comparing(NetworkIF::getIndex))
         .map(SystemModule::getNetData)
-        .findFirst()
         .orElse(new NetData("", 0, 0));
   }
 
